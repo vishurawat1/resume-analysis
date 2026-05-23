@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Resume Analyzer SaaS 🚀
 
-## Getting Started
+A full-stack, AI-powered Next.js application that evaluates resumes, scores them against job descriptions, and provides interactive, ATS-friendly enhancements. The platform features a premium UI, deep visual analytics, and a custom PDF generation engine that automatically converts unstructured resumes into strict, Harvard-style ATS formats.
 
-First, run the development server:
+## 🌟 Core Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Multi-Format Resume Parsing:** Upload and parse raw text from both PDF and DOCX files securely in the browser.
+- **Deep ATS Analytics:** Evaluates resumes holistically and against specific job descriptions. Visualizes strengths and weaknesses using interactive Radar Charts and section breakdowns.
+- **Interactive AI Improvement Engine:** Generates highly specific, metrics-driven bullet point replacements. Users can accept/reject suggestions in real-time, instantly modifying their draft.
+- **Dynamic PDF Generation:** Automatically maps flat unstructured text into a strict, standardized Harvard-style ATS resume template. Exports native, text-selectable PDFs directly from the browser.
+- **Intelligent Caching:** Implements a Firestore-backed AI caching layer to dramatically reduce API costs and latency when users rescan identical documents.
+- **Dark Mode & Premium UI:** Built with Tailwind CSS, Framer Motion, and Recharts for a dynamic, fully responsive, and professional SaaS experience.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Technology Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Frontend / Fullstack:** [Next.js 16 (App Router)](https://nextjs.org/), React 19, TypeScript
+- **Styling & UI:** Tailwind CSS, Framer Motion, Lucide-React
+- **Data Visualization:** Recharts (Radar, Radial, and Bar graphs)
+- **Backend Services:** Firebase (Authentication & Firestore Database)
+- **AI Integration:** Groq (Llama 3), with automated fallback to Gemini API for high-availability unstructured parsing.
+- **Document Processing:** `pdf-parse`, `mammoth` (Docx), `@react-pdf/renderer` (PDF Export)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🏗️ Architecture Highlights
 
-## Learn More
+### The AI Pipeline
+The AI layer uses an intelligent orchestration service (`src/services/aiService.ts`) which intercepts requests before sending them to the LLM. 
+1. **Cache Check:** Verifies if a SHA-256 hash of the exact prompt exists in Firestore.
+2. **Primary Execution:** Calls Groq's insanely fast inference endpoint.
+3. **Structured Output:** Forces the LLM to return strict, heavily constrained JSON payloads (Strengths, Weaknesses, Scores, Keyword Density, Exact Substring Replacements).
+4. **Fallback:** Falls back to OpenRouter/Gemini in case of latency or strict rate limits.
 
-To learn more about Next.js, take a look at the following resources:
+### Structured ATS PDF Engine
+Standardizing unstructured resumes into a single ATS format is a notoriously difficult computer science problem. This app solves it by:
+1. Sending the flat, optimized text array to a background AI parser (`/api/build-resume`).
+2. Mapping the output into a strict TypeScript interface (`ResumeData`).
+3. Feeding the structured JSON into `@react-pdf/renderer` to draw a flawless, one-column, Times New Roman, ATS-friendly layout.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🔒 Security
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Payload Protection:** All API routes (`/api/*`) are secured against memory exhaustion attacks (5MB file size hard limits, 20,000 character string limits).
+- **Client-Side Secrets Isolation:** AI API keys are strictly executed server-side.
+- **Rate Limiting:** In-memory request tracking prevents DDoS and API quota drainage.
+- **Database Rules:** Strict Firestore Security Rules ensure users can only ever access their own `data/resume` collections, and blocks the frontend from accessing the backend `ai-cache`.
 
-## Deploy on Vercel
+## 🚀 Getting Started
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Set up your `.env.local` file with the following keys:
+   ```env
+   GEMINI_API_KEY=your_key
+   GROQ_API_KEY=your_key
+   NEXT_PUBLIC_FIREBASE_API_KEY=your_key
+   # ... add remaining Firebase config keys
+   ```
+4. Start the development server:
+   ```bash
+   npm run dev
+   ```
+5. Open `http://localhost:3000` to interact with the platform.
