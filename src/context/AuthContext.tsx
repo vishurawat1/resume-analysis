@@ -21,23 +21,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
+    // Use authStateReady to guarantee local IndexedDB persistence hydration has resolved
+    if (typeof auth.authStateReady === "function") {
+      auth.authStateReady().then(() => {
+        if (isMounted) {
+          setUser(auth.currentUser);
+          setLoading(false);
+        }
+      });
+    }
+
     const unsubscribe = onAuthStateChanged(
       auth,
       (currentUser) => {
-        setUser(currentUser);
-        setLoading(false);
+        if (isMounted) {
+          setUser(currentUser);
+          setLoading(false);
+        }
       },
       (error) => {
         console.error("Firebase auth state error:", error);
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
     await firebaseSignOut(auth);
+    setUser(null);
   };
 
   return (

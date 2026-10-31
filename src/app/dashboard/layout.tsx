@@ -18,14 +18,8 @@ export default function DashboardLayout({
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
-      // Debounce redirect to allow Firebase IndexedDB session hydration
-      const timer = setTimeout(() => {
-        if (!auth.currentUser) {
-          router.replace("/login");
-        }
-      }, 600);
-      return () => clearTimeout(timer);
+    if (!loading && !user && !auth.currentUser) {
+      router.replace("/login");
     }
   }, [user, loading, router]);
 

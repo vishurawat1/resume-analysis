@@ -13,8 +13,10 @@ import { auth } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { Sparkles, Mail, Lock, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,9 +28,9 @@ export default function LoginPage() {
   // 1. Auto-redirect as soon as user state becomes authenticated
   useEffect(() => {
     if (user && !authLoading) {
-      window.location.replace("/dashboard");
+      router.replace("/dashboard");
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, router]);
 
   // 2. Handle Google redirect callback if signInWithRedirect was used
   useEffect(() => {
@@ -36,7 +38,7 @@ export default function LoginPage() {
     getRedirectResult(auth)
       .then((result) => {
         if (result?.user && isMounted) {
-          window.location.replace("/dashboard");
+          router.replace("/dashboard");
         }
       })
       .catch((err: unknown) => {
@@ -60,7 +62,7 @@ export default function LoginPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [router]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,7 +75,7 @@ export default function LoginPage() {
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
       }
-      window.location.replace("/dashboard");
+      router.replace("/dashboard");
     } catch (err: unknown) {
       const error = err as Error;
       setError(error.message || "Authentication failed. Please try again.");
@@ -90,13 +92,13 @@ export default function LoginPage() {
     try {
       const userCredential = await signInWithPopup(auth, provider);
       if (userCredential?.user) {
-        window.location.replace("/dashboard");
+        router.replace("/dashboard");
         return;
       }
     } catch (err: unknown) {
       // Check if user actually signed in despite any popup event
       if (auth.currentUser) {
-        window.location.replace("/dashboard");
+        router.replace("/dashboard");
         return;
       }
 
@@ -109,13 +111,19 @@ export default function LoginPage() {
           return;
         } catch (redirectErr: unknown) {
           console.error("Fallback signInWithRedirect failed:", redirectErr);
-          setError("Popup was blocked by your browser and redirect failed. Please allow popups or try again.");
+          setError("Popup was blocked by your browser. Please allow popups for this site.");
           setLoading(false);
         }
       } else if (error.code === "auth/popup-closed-by-user") {
-        // User closed the popup, or popup finished without passing token
-        setError("Sign-in was cancelled or the popup was closed. Please try again.");
-        setLoading(false);
+        // Wait 500ms to see if user session resolves before showing error
+        setTimeout(() => {
+          if (auth.currentUser) {
+            router.replace("/dashboard");
+          } else {
+            setError("Sign-in was cancelled or the popup was closed. Please try again.");
+            setLoading(false);
+          }
+        }, 500);
       } else if (error.code === "auth/operation-not-allowed") {
         setError(
           "Google Sign-In is DISABLED in Firebase. Go to Firebase Console > Authentication > Sign-in method > Click Google > Enable it, choose a Support Email, and click Save."

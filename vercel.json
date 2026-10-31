@@ -1,0 +1,19 @@
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/__/auth/:path*",
+      "destination": "https://resume-analysis-bd6d0.firebaseapp.com/__/auth/:path*"
+    }
+  ]
+}
