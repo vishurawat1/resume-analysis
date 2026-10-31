@@ -47,8 +47,12 @@ export default function LoginPage() {
           setError(
             "This domain is not authorized in Firebase. Add your Vercel URL to Firebase Console > Authentication > Settings > Authorized Domains."
           );
+        } else if (error.code === "auth/operation-not-allowed") {
+          setError(
+            "Google Sign-In is disabled in Firebase. Go to Firebase Console > Authentication > Sign-in method > Enable Google."
+          );
         } else if (error.code && error.code !== "auth/popup-closed-by-user") {
-          setError(error.message || "Redirect authentication failed.");
+          setError(`[${error.code}]: ${error.message || "Redirect authentication failed."}`);
         }
         setLoading(false);
       });
@@ -93,26 +97,34 @@ export default function LoginPage() {
       const error = err as { code?: string; message?: string };
       console.warn("Google signInWithPopup error code:", error.code);
 
-      if (error.code === "auth/popup-blocked") {
+      if (error.code === "auth/popup-blocked" || error.code === "auth/popup-closed-by-user") {
         try {
+          // If popup was blocked or cross-origin popup communication failed, fall back to redirect
           await signInWithRedirect(auth, provider);
           return;
         } catch (redirectErr: unknown) {
           const rErr = redirectErr as { code?: string; message?: string };
           console.error("Fallback signInWithRedirect failed:", rErr);
-          setError("Popup was blocked by your browser and redirect failed. Please allow popups or try again.");
+          setError("Google sign-in could not complete. Please check your browser popup settings or Firebase setup.");
           setLoading(false);
         }
-      } else if (error.code === "auth/unauthorized-domain") {
+      } else if (error.code === "auth/operation-not-allowed") {
         setError(
-          "This domain is not authorized. Please go to Firebase Console > Authentication > Settings > Authorized Domains, and add your Vercel app domain."
+          "Google Sign-In is DISABLED in Firebase. Go to Firebase Console > Authentication > Sign-in method > Click Google > Enable it, choose a Support Email, and click Save."
         );
         setLoading(false);
-      } else if (error.code === "auth/popup-closed-by-user") {
-        setError("Sign-in popup was closed before completing.");
+      } else if (error.code === "auth/unauthorized-domain") {
+        setError(
+          "This Vercel domain is not authorized. Go to Firebase Console > Authentication > Settings > Authorized Domains, and add your Vercel URL."
+        );
+        setLoading(false);
+      } else if (error.code === "auth/invalid-api-key" || error.code === "auth/api-key-not-valid") {
+        setError(
+          "Invalid Firebase API Key. Please make sure you redeployed on Vercel after adding your NEXT_PUBLIC_FIREBASE_* keys."
+        );
         setLoading(false);
       } else {
-        setError(error.message || "Google authentication failed.");
+        setError(error.message ? `[${error.code || "auth/error"}]: ${error.message}` : "Google authentication failed.");
         setLoading(false);
       }
     }
