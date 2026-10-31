@@ -1,7 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+export const getGeminiClient = () => {
+  const apiKey = process.env.GEMINI_API_KEY || "dummy-key-to-prevent-crash";
+  return new GoogleGenerativeAI(apiKey);
+};
 
-export const model = genAI.getGenerativeModel({
-  model: "gemini-2.0-flash",
+export const model = getGeminiClient().getGenerativeModel({
+  model: "gemini-3.5-flash-lite",
 });

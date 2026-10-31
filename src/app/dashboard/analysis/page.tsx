@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { replaceResumeSubstring } from "@/lib/utils";
 
 interface DeepAIResult {
   overallScore: number;
@@ -108,8 +109,8 @@ export default function AnalysisPage() {
   }, [user, authLoading]);
 
   const handleAcceptSuggestion = (original: string, improved: string) => {
-    // Replace the exact original string with the improved version in our working draft
-    setOptimizedResumeText(prev => prev.replace(original, improved));
+    // Resiliently replace the original string with the improved version in our working draft
+    setOptimizedResumeText(prev => replaceResumeSubstring(prev, original, improved));
   };
 
   const handleRejectSuggestion = () => {

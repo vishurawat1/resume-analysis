@@ -73,7 +73,7 @@ Provide a structured JSON response EXACTLY matching this format:
     
     if (errorMessage.includes("429") || errorMessage.includes("quota")) {
       return NextResponse.json(
-        { error: "You've hit the daily AI limit (20 requests/day on the free plan). Please try again tomorrow or upgrade your Gemini API plan." },
+        { error: "AI rate limit or quota exceeded across all providers. Please try again shortly." },
         { status: 429 }
       );
     }

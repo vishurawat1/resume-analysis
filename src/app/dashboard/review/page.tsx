@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Dropzone } from "@/components/ui/Dropzone";
 import { Sparkles, AlertCircle, FileText, CheckCircle2, XCircle, ArrowUpRight, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, replaceResumeSubstring } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -39,7 +39,7 @@ export default function ReviewPage() {
   const [reviewError, setReviewError] = useState("");
 
   const handleAcceptSuggestion = (original: string, improved: string) => {
-    setOptimizedResumeText(prev => prev.replace(original, improved));
+    setOptimizedResumeText(prev => replaceResumeSubstring(prev, original, improved));
   };
 
   const handleRejectSuggestion = () => {
