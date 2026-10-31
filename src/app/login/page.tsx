@@ -26,7 +26,7 @@ export default function LoginPage() {
   // 1. Auto-redirect as soon as user state becomes authenticated
   useEffect(() => {
     if (user && !authLoading) {
-      window.location.href = "/dashboard";
+      window.location.replace("/dashboard");
     }
   }, [user, authLoading]);
 
@@ -36,7 +36,7 @@ export default function LoginPage() {
     getRedirectResult(auth)
       .then((result) => {
         if (result?.user && isMounted) {
-          window.location.href = "/dashboard";
+          window.location.replace("/dashboard");
         }
       })
       .catch((err: unknown) => {
@@ -73,7 +73,7 @@ export default function LoginPage() {
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
       }
-      window.location.href = "/dashboard";
+      window.location.replace("/dashboard");
     } catch (err: unknown) {
       const error = err as Error;
       setError(error.message || "Authentication failed. Please try again.");
@@ -90,24 +90,32 @@ export default function LoginPage() {
     try {
       const userCredential = await signInWithPopup(auth, provider);
       if (userCredential?.user) {
-        window.location.href = "/dashboard";
+        window.location.replace("/dashboard");
         return;
       }
     } catch (err: unknown) {
-      const error = err as { code?: string; message?: string };
-      console.warn("Google signInWithPopup error code:", error.code);
+      // Check if user actually signed in despite any popup event
+      if (auth.currentUser) {
+        window.location.replace("/dashboard");
+        return;
+      }
 
-      if (error.code === "auth/popup-blocked" || error.code === "auth/popup-closed-by-user") {
+      const error = err as { code?: string; message?: string };
+      console.warn("Google signInWithPopup error:", error.code, error.message);
+
+      if (error.code === "auth/popup-blocked") {
         try {
-          // If popup was blocked or cross-origin popup communication failed, fall back to redirect
           await signInWithRedirect(auth, provider);
           return;
         } catch (redirectErr: unknown) {
-          const rErr = redirectErr as { code?: string; message?: string };
-          console.error("Fallback signInWithRedirect failed:", rErr);
-          setError("Google sign-in could not complete. Please check your browser popup settings or Firebase setup.");
+          console.error("Fallback signInWithRedirect failed:", redirectErr);
+          setError("Popup was blocked by your browser and redirect failed. Please allow popups or try again.");
           setLoading(false);
         }
+      } else if (error.code === "auth/popup-closed-by-user") {
+        // User closed the popup, or popup finished without passing token
+        setError("Sign-in was cancelled or the popup was closed. Please try again.");
+        setLoading(false);
       } else if (error.code === "auth/operation-not-allowed") {
         setError(
           "Google Sign-In is DISABLED in Firebase. Go to Firebase Console > Authentication > Sign-in method > Click Google > Enable it, choose a Support Email, and click Save."
@@ -119,9 +127,7 @@ export default function LoginPage() {
         );
         setLoading(false);
       } else if (error.code === "auth/invalid-api-key" || error.code === "auth/api-key-not-valid") {
-        setError(
-          "Invalid Firebase API Key. Please make sure you redeployed on Vercel after adding your NEXT_PUBLIC_FIREBASE_* keys."
-        );
+        setError("Invalid Firebase API Key. Please verify your configuration.");
         setLoading(false);
       } else {
         setError(error.message ? `[${error.code || "auth/error"}]: ${error.message}` : "Google authentication failed.");

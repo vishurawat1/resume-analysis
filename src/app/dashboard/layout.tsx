@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Navbar } from "@/components/layout/Navbar";
 import { useAuth } from "@/context/AuthContext";
+import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
@@ -18,7 +19,13 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push("/login");
+      // Debounce redirect to allow Firebase IndexedDB session hydration
+      const timer = setTimeout(() => {
+        if (!auth.currentUser) {
+          router.replace("/login");
+        }
+      }, 600);
+      return () => clearTimeout(timer);
     }
   }, [user, loading, router]);
 
@@ -33,16 +40,22 @@ export default function DashboardLayout({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  if (loading) {
+  if (loading || (!user && auth.currentUser)) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center space-y-4">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        <p className="text-muted-foreground text-sm font-medium animate-pulse">Loading dashboard...</p>
       </div>
     );
   }
 
   if (!user) {
-    return null; // Will redirect in useEffect
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        <p className="text-muted-foreground text-sm font-medium animate-pulse">Checking session...</p>
+      </div>
+    );
   }
 
   return (
@@ -62,4 +75,3 @@ export default function DashboardLayout({
     </div>
   );
 }
-
