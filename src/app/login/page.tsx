@@ -7,10 +7,10 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
-  GoogleAuthProvider
+  GoogleAuthProvider,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { Sparkles, Mail, Lock, Loader2 } from "lucide-react";
 import Link from "next/link";
 
@@ -20,26 +20,43 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  
+  const { user, loading: authLoading } = useAuth();
 
+  // 1. Auto-redirect as soon as user state becomes authenticated
   useEffect(() => {
-    // Check if user is returning from a Google redirect sign-in
+    if (user && !authLoading) {
+      window.location.href = "/dashboard";
+    }
+  }, [user, authLoading]);
+
+  // 2. Handle Google redirect callback if signInWithRedirect was used
+  useEffect(() => {
+    let isMounted = true;
     getRedirectResult(auth)
       .then((result) => {
-        if (result?.user) {
-          router.push("/dashboard");
+        if (result?.user && isMounted) {
+          window.location.href = "/dashboard";
         }
       })
       .catch((err: unknown) => {
+        if (!isMounted) return;
         const error = err as { code?: string; message?: string };
         console.error("Redirect sign-in error:", error);
         if (error.code === "auth/unauthorized-domain") {
-          setError("This domain is not authorized in Firebase. Add your Vercel URL to Firebase Console > Authentication > Settings > Authorized Domains.");
-        } else if (error.code) {
+          setError(
+            "This domain is not authorized in Firebase. Add your Vercel URL to Firebase Console > Authentication > Settings > Authorized Domains."
+          );
+        } else if (error.code && error.code !== "auth/popup-closed-by-user") {
           setError(error.message || "Redirect authentication failed.");
         }
+        setLoading(false);
       });
-  }, [router]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,11 +69,10 @@ export default function LoginPage() {
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
       }
-      router.push("/dashboard");
+      window.location.href = "/dashboard";
     } catch (err: unknown) {
       const error = err as Error;
       setError(error.message || "Authentication failed. Please try again.");
-    } finally {
       setLoading(false);
     }
   };
@@ -68,26 +84,28 @@ export default function LoginPage() {
     provider.setCustomParameters({ prompt: "select_account" });
 
     try {
-      await signInWithPopup(auth, provider);
-      router.push("/dashboard");
+      const userCredential = await signInWithPopup(auth, provider);
+      if (userCredential?.user) {
+        window.location.href = "/dashboard";
+        return;
+      }
     } catch (err: unknown) {
       const error = err as { code?: string; message?: string };
       console.warn("Google signInWithPopup error code:", error.code);
 
       if (error.code === "auth/popup-blocked") {
-        // Fall back to full-page redirect to bypass browser popup blockers
         try {
           await signInWithRedirect(auth, provider);
           return;
         } catch (redirectErr: unknown) {
           const rErr = redirectErr as { code?: string; message?: string };
           console.error("Fallback signInWithRedirect failed:", rErr);
-          setError("Popup was blocked by your browser and redirect failed. Please enable popups or add your domain to Firebase.");
+          setError("Popup was blocked by your browser and redirect failed. Please allow popups or try again.");
           setLoading(false);
         }
       } else if (error.code === "auth/unauthorized-domain") {
         setError(
-          "This Vercel domain is not authorized. Please go to Firebase Console > Authentication > Settings > Authorized Domains, and add your Vercel app domain."
+          "This domain is not authorized. Please go to Firebase Console > Authentication > Settings > Authorized Domains, and add your Vercel app domain."
         );
         setLoading(false);
       } else if (error.code === "auth/popup-closed-by-user") {
@@ -99,6 +117,18 @@ export default function LoginPage() {
       }
     }
   };
+
+  // If user is already authenticated or verifying redirect token, show seamless loading
+  if (authLoading || user) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+        <p className="text-muted-foreground text-sm font-medium animate-pulse">
+          {user ? "Redirecting to your dashboard..." : "Verifying session..."}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
