@@ -21,6 +21,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className={`${fontSans.variable} h-full antialiased`}>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app') && window.location.hostname !== 'vr-resume-analysis.vercel.app') {
+                window.location.replace('https://vr-resume-analysis.vercel.app' + window.location.pathname + window.location.search);
+              }
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col relative bg-background selection:bg-primary/20">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
