@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-// @ts-expect-error - No types available for this specific file
-import pdfParse from "pdf-parse/lib/pdf-parse.js";
+import { parsePdfBuffer } from "@/lib/pdf-parser";
 import mammoth from "mammoth";
 import { applyRateLimit } from "@/lib/rate-limit";
 
@@ -32,8 +31,7 @@ export async function POST(req: NextRequest) {
     let extractedText = "";
 
     if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-      const data = await pdfParse(buffer);
-      extractedText = data.text;
+      extractedText = await parsePdfBuffer(buffer);
     } else if (
       file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       file.name.toLowerCase().endsWith(".docx")
@@ -53,7 +51,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ text: extractedText });
   } catch (error: unknown) {
     console.error("Error parsing document:", error);
-    const errorMessage = error instanceof Error ? error.message : "Failed to parse document";
+    let errorMessage = error instanceof Error ? error.message : "Failed to parse document";
+    if (errorMessage.includes("Illegal character") || errorMessage.includes("FormatError")) {
+      errorMessage = "The uploaded PDF has malformed internal syntax or an unsupported font encoding. Please re-save or re-export it as a clean PDF or DOCX file.";
+    }
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

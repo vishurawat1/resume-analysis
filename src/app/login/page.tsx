@@ -64,6 +64,32 @@ export default function LoginPage() {
     };
   }, [router]);
 
+  const getFriendlyErrorMessage = (error: { code?: string; message?: string }) => {
+    switch (error.code) {
+      case "auth/invalid-credential":
+      case "auth/user-not-found":
+        return isLogin
+          ? "Invalid email or password. If you don't have an account yet, click 'Sign up' below."
+          : "Invalid credentials. Please check your details.";
+      case "auth/wrong-password":
+        return "Incorrect password. Please try again.";
+      case "auth/email-already-in-use":
+        return "An account with this email already exists. Please switch to 'Sign in' below.";
+      case "auth/weak-password":
+        return "Password is too weak. Please use at least 6 characters.";
+      case "auth/invalid-email":
+        return "Please enter a valid email address.";
+      case "auth/too-many-requests":
+        return "Too many failed attempts. Please try again later or reset your password.";
+      case "auth/unauthorized-domain":
+        return "This domain is not authorized in Firebase. Add this domain to Firebase Console > Authentication > Settings > Authorized Domains.";
+      case "auth/operation-not-allowed":
+        return "This sign-in method is disabled in Firebase Console > Authentication > Sign-in method.";
+      default:
+        return error.message || "Authentication failed. Please try again.";
+    }
+  };
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -77,8 +103,8 @@ export default function LoginPage() {
       }
       router.replace("/dashboard");
     } catch (err: unknown) {
-      const error = err as Error;
-      setError(error.message || "Authentication failed. Please try again.");
+      const error = err as { code?: string; message?: string };
+      setError(getFriendlyErrorMessage(error));
       setLoading(false);
     }
   };
@@ -267,7 +293,10 @@ export default function LoginPage() {
           <p className="text-sm text-muted-foreground">
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
             <button
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => {
+                setError("");
+                setIsLogin(!isLogin);
+              }}
               className="font-semibold text-primary hover:text-primary/80 transition-colors"
             >
               {isLogin ? "Sign up" : "Sign in"}
