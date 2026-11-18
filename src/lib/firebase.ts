@@ -3,13 +3,16 @@ import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth"
 import { getFirestore } from "firebase/firestore";
 
 const getAuthDomain = () => {
-  if (process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN) {
-    return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+  if (typeof window !== "undefined") {
+    // On localhost, use the standard firebaseapp domain
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "resume-analysis-bd6d0.firebaseapp.com";
+    }
+    // On live production (vr-resume-analysis.vercel.app), ALWAYS use same-origin host
+    // to prevent Chrome/Safari third-party cookie and storage partitioning blocks
+    return window.location.host;
   }
-  if (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
-    return "resume-analysis-bd6d0.firebaseapp.com";
-  }
-  // Production Vercel domain - same origin prevents Chrome third-party storage partitioning
+  // Build / SSR fallback
   return "vr-resume-analysis.vercel.app";
 };
 
