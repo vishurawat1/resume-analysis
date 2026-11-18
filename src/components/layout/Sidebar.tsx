@@ -2,15 +2,59 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Upload, FileText, Settings, X, Sparkles, Wand2 } from "lucide-react";
+import { 
+  LayoutDashboard, 
+  UploadCloud, 
+  BarChart3, 
+  Settings, 
+  X, 
+  Sparkles, 
+  Wand2,
+  FileCheck,
+  CheckCircle2
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const navigation = [
-  { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Analysis Results", href: "/dashboard/analysis", icon: FileText },
-  { name: "Resume Review", href: "/dashboard/review", icon: Sparkles },
-  { name: "Bullet Enhancer", href: "/dashboard/enhancer", icon: Wand2 },
-  { name: "Upload Resume", href: "/dashboard/upload", icon: Upload },
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ElementType;
+  description: string;
+  highlight?: boolean;
+}
+
+const navigation: NavItem[] = [
+  { 
+    name: "Scan New Resume", 
+    href: "/dashboard/upload", 
+    icon: UploadCloud,
+    description: "Target job match & analysis",
+    highlight: true,
+  },
+  { 
+    name: "ATS Score & Report", 
+    href: "/dashboard/analysis", 
+    icon: BarChart3,
+    description: "Scores, commute & scam radar",
+  },
+  { 
+    name: "Resume Health Audit", 
+    href: "/dashboard/review", 
+    icon: Sparkles,
+    description: "Overall strengths & weaknesses",
+  },
+  { 
+    name: "AI Bullet Rewriter", 
+    href: "/dashboard/enhancer", 
+    icon: Wand2,
+    description: "Turn duties into achievements",
+  },
+  { 
+    name: "Dashboard Home", 
+    href: "/dashboard", 
+    icon: LayoutDashboard,
+    description: "Saved scans & recent history",
+  },
 ];
 
 export function Sidebar({
@@ -43,28 +87,29 @@ export function Sidebar({
           <span className="font-semibold text-lg">Menu</span>
           <button
             onClick={onClose}
-            className="p-2 text-muted-foreground hover:bg-accent rounded-lg transition-colors"
+            className="p-2 text-muted-foreground hover:bg-accent rounded-lg transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 px-3 py-6">
-          <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-4 px-3">
-            Navigation
+        <nav className="flex-1 space-y-1.5 px-3 py-6">
+          <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 px-3">
+            Core Tools
           </div>
           {navigation.map((item) => {
             const isActive = pathname === item.href;
+            const Icon = item.icon;
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                  "group flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 select-none",
                   isActive
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
                 onClick={() => {
                   if (window.innerWidth < 768) {
@@ -72,16 +117,31 @@ export function Sidebar({
                   }
                 }}
               >
-                <item.icon
+                <Icon
                   className={cn(
-                    "h-[18px] w-[18px] flex-shrink-0 transition-colors",
+                    "h-4 w-4 mt-0.5 shrink-0 transition-colors",
                     isActive
                       ? "text-primary-foreground"
-                      : "text-muted-foreground group-hover:text-accent-foreground"
+                      : "text-muted-foreground group-hover:text-foreground"
                   )}
                   aria-hidden="true"
                 />
-                {item.name}
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold truncate leading-tight">
+                      {item.name}
+                    </span>
+                    {item.highlight && !isActive && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    )}
+                  </div>
+                  <span className={cn(
+                    "text-[10px] truncate leading-tight mt-0.5",
+                    isActive ? "text-primary-foreground/80 font-normal" : "text-muted-foreground/80"
+                  )}>
+                    {item.description}
+                  </span>
+                </div>
               </Link>
             );
           })}
@@ -92,23 +152,30 @@ export function Sidebar({
           <Link
             href="/dashboard/settings"
             className={cn(
-              "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium transition-all duration-200",
               pathname === "/dashboard/settings"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
           >
             <Settings className={cn(
-              "h-[18px] w-[18px] transition-colors",
+              "h-4 w-4 transition-colors",
               pathname === "/dashboard/settings"
                 ? "text-primary-foreground"
-                : "text-muted-foreground group-hover:text-accent-foreground"
+                : "text-muted-foreground group-hover:text-foreground"
             )} />
-            Settings
+            <div className="flex flex-col">
+              <span className="font-semibold">Account Settings</span>
+              <span className={cn(
+                "text-[10px]",
+                pathname === "/dashboard/settings" ? "text-primary-foreground/80" : "text-muted-foreground/80"
+              )}>
+                Profile & preferences
+              </span>
+            </div>
           </Link>
         </div>
       </div>
     </>
   );
 }
-

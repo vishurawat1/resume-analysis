@@ -83,19 +83,19 @@ export default function LandingPage() {
           </span>
         </div>
 
-        <nav className="hidden md:flex items-center gap-8 text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+        <nav className="hidden md:flex items-center gap-7 text-xs font-semibold tracking-wide uppercase text-muted-foreground">
           <Link href="#app-tour" className="hover:text-foreground transition-colors flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Product Tour
+            Live Demo
           </Link>
           <Link href="#how-it-works" className="hover:text-foreground transition-colors">
-            Workflow
+            How It Works
           </Link>
           <Link href="#features" className="hover:text-foreground transition-colors">
-            Capabilities
+            Features
           </Link>
           <Link href="#comparison" className="hover:text-foreground transition-colors">
-            Before & After
+            Sample Results
           </Link>
           <Link href="#faq" className="hover:text-foreground transition-colors">
             FAQ
@@ -344,13 +344,16 @@ export default function LandingPage() {
 
           <div className="flex items-center gap-6">
             <Link href="#app-tour" className="hover:text-foreground transition-colors">
-              Product Tour
+              Live Demo
             </Link>
             <Link href="#how-it-works" className="hover:text-foreground transition-colors">
-              Workflow
+              How It Works
             </Link>
             <Link href="#features" className="hover:text-foreground transition-colors">
-              Capabilities
+              Features
+            </Link>
+            <Link href="#comparison" className="hover:text-foreground transition-colors">
+              Sample Results
             </Link>
             <Link href="#faq" className="hover:text-foreground transition-colors">
               FAQ
