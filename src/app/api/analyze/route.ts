@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     const rateLimitResponse = applyRateLimit(req);
     if (rateLimitResponse) return rateLimitResponse;
 
-    const { resumeText, jobDescription, company, location, jobTitle } = await req.json();
+    const { resumeText, jobDescription, company, location, jobTitle, candidateLocation } = await req.json();
 
     if (!resumeText || !jobDescription) {
       return NextResponse.json(
@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
       company: typeof company === "string" ? company.trim() : undefined,
       location: typeof location === "string" ? location.trim() : undefined,
       jobTitle: typeof jobTitle === "string" ? jobTitle.trim() : undefined,
+      candidateLocation: typeof candidateLocation === "string" ? candidateLocation.trim() : undefined,
     });
     const text = await generateAIResponse(prompt);
 
@@ -141,8 +142,12 @@ export async function POST(req: NextRequest) {
 
     // Normalize Location & Commute Intelligence
     const rawLoc = parsed.locationIntelligence;
+    const resolvedCandidateLoc = (typeof candidateLocation === "string" && candidateLocation.trim().length > 0)
+      ? candidateLocation.trim()
+      : (rawLoc?.candidateLocation?.trim() || "Not specified on resume");
+
     const locationIntelligence = {
-      candidateLocation: rawLoc?.candidateLocation?.trim() || "Not specified on resume",
+      candidateLocation: resolvedCandidateLoc,
       jobLocation: rawLoc?.jobLocation?.trim() || location || "As specified in job posting",
       workModel: rawLoc?.workModel || "On-Site / Hybrid",
       commuteFeasibility: rawLoc?.commuteFeasibility || "Manageable",

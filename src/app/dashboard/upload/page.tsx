@@ -243,6 +243,8 @@ export default function UploadPage() {
               sessionStorage.setItem("jobTitle", jobTitle);
               sessionStorage.setItem("company", company);
               sessionStorage.setItem("location", location);
+              const storedHome = localStorage.getItem("userHomeLocation");
+              if (storedHome) sessionStorage.setItem("userHomeLocation", storedHome);
               
               router.push("/dashboard/analysis");
             } catch (err) {

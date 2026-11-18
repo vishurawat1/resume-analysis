@@ -60,31 +60,46 @@ export default function AnalysisPage() {
       let jobTitle = sessionStorage.getItem("jobTitle") || "";
       let company = sessionStorage.getItem("company") || "";
       let location = sessionStorage.getItem("location") || "";
+      let candidateLocation =
+        sessionStorage.getItem("userHomeLocation") ||
+        (typeof window !== "undefined" ? localStorage.getItem("userHomeLocation") : null) ||
+        "";
 
       // Fallback to Firestore if we have a logged-in user and session is empty
-      if ((!resumeText || !jobDescription) && user) {
+      if (user) {
         try {
-          const docRef = doc(db, "users", user.uid, "data", "resume");
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            resumeText = data.text;
-            jobDescription = data.jobDescription;
-            fName = data.fileName;
-            jobTitle = data.jobTitle || "";
-            company = data.company || "";
-            location = data.location || "";
-            
-            // Re-hydrate session storage
-            if (resumeText) sessionStorage.setItem("resumeText", resumeText);
-            if (jobDescription) sessionStorage.setItem("jobDescription", jobDescription);
-            if (fName) sessionStorage.setItem("fileName", fName);
-            if (jobTitle) sessionStorage.setItem("jobTitle", jobTitle);
-            if (company) sessionStorage.setItem("company", company);
-            if (location) sessionStorage.setItem("location", location);
+          if (!resumeText || !jobDescription) {
+            const docRef = doc(db, "users", user.uid, "data", "resume");
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              resumeText = data.text;
+              jobDescription = data.jobDescription;
+              fName = data.fileName;
+              jobTitle = data.jobTitle || "";
+              company = data.company || "";
+              location = data.location || "";
+              
+              // Re-hydrate session storage
+              if (resumeText) sessionStorage.setItem("resumeText", resumeText);
+              if (jobDescription) sessionStorage.setItem("jobDescription", jobDescription);
+              if (fName) sessionStorage.setItem("fileName", fName);
+              if (jobTitle) sessionStorage.setItem("jobTitle", jobTitle);
+              if (company) sessionStorage.setItem("company", company);
+              if (location) sessionStorage.setItem("location", location);
+            }
+          }
+
+          if (!candidateLocation) {
+            const settingsRef = doc(db, "users", user.uid, "data", "settings");
+            const settingsSnap = await getDoc(settingsRef);
+            if (settingsSnap.exists() && settingsSnap.data()?.homeLocation) {
+              candidateLocation = settingsSnap.data().homeLocation;
+              sessionStorage.setItem("userHomeLocation", candidateLocation);
+            }
           }
         } catch (err) {
-          console.error("Failed to fetch resume from Firestore:", err);
+          console.error("Failed to fetch resume/settings from Firestore:", err);
         }
       }
 
@@ -103,7 +118,7 @@ export default function AnalysisPage() {
       fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resumeText, jobDescription, jobTitle, company, location }),
+        body: JSON.stringify({ resumeText, jobDescription, jobTitle, company, location, candidateLocation }),
       })
         .then((res) => res.json())
         .then((data) => {

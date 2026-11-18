@@ -1,6 +1,7 @@
 "use client";
 
-import { MapPin, Globe, Compass, Rocket, AlertTriangle, CheckCircle2, Navigation, ArrowRight } from "lucide-react";
+import Link from "next/link";
+import { MapPin, Globe, Compass, Rocket, AlertTriangle, CheckCircle2, Navigation, Settings2 } from "lucide-react";
 
 export interface LocationIntelligence {
   candidateLocation: string;
@@ -80,32 +81,48 @@ export function LocationIntelligenceCard({ data }: { data?: LocationIntelligence
         </div>
 
         {/* Origin to Destination Route */}
-        <div className="bg-muted/40 rounded-lg p-3.5 border border-border/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
-            <div className="min-w-0">
-              <span className="text-[11px] text-muted-foreground uppercase tracking-wider block font-medium">Your Location</span>
-              <span className="font-semibold text-foreground truncate block">{data.candidateLocation || "On Resume"}</span>
+        <div className="bg-muted/30 rounded-xl p-3.5 border border-border/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+          {/* Your Location */}
+          <div className="flex items-start gap-2.5 min-w-0 p-3 rounded-lg bg-card/70 border border-border/60">
+            <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 mt-1" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-1 mb-0.5">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Your Location</span>
+                <Link
+                  href="/dashboard/settings"
+                  className="text-[10px] text-primary hover:underline font-medium inline-flex items-center gap-0.5"
+                  title="Configure your home location in Personal Settings"
+                >
+                  <Settings2 className="w-2.5 h-2.5" />
+                  Edit
+                </Link>
+              </div>
+              <p className="font-semibold text-foreground text-sm leading-snug break-words">
+                {data.candidateLocation || "Not specified on resume"}
+              </p>
             </div>
           </div>
 
-          <div className="hidden sm:flex items-center gap-1.5 text-muted-foreground px-2">
-            <div className="h-[1px] w-8 bg-border" />
-            <ArrowRight className="w-3.5 h-3.5" />
-            <div className="h-[1px] w-8 bg-border" />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSpaceOrFantasy ? "bg-purple-500 animate-ping" : "bg-emerald-500"}`} />
-            <div className="min-w-0">
-              <span className="text-[11px] text-muted-foreground uppercase tracking-wider block font-medium">Job Location</span>
-              <span className="font-semibold text-foreground truncate block">{data.jobLocation || "Specified in JD"}</span>
+          {/* Job Location */}
+          <div className="flex items-start gap-2.5 min-w-0 p-3 rounded-lg bg-card/70 border border-border/60">
+            <div className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1 ${isSpaceOrFantasy ? "bg-purple-500 animate-ping" : "bg-emerald-500"}`} />
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold block mb-0.5">Job Location</span>
+              <p className="font-semibold text-foreground text-sm leading-snug break-words">
+                {data.jobLocation || "Specified in JD"}
+              </p>
             </div>
           </div>
 
-          <div className="sm:border-l sm:border-border sm:pl-3 flex flex-col justify-center">
-            <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">Est. Distance</span>
-            <span className="font-mono text-xs font-bold text-foreground">{data.distanceEstimate || "Local / Remote"}</span>
+          {/* Est. Distance */}
+          <div className="flex items-start gap-2.5 min-w-0 p-3 rounded-lg bg-card/70 border border-border/60 sm:col-span-2 lg:col-span-1">
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 mt-1" />
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold block mb-0.5">Est. Distance</span>
+              <p className="font-mono text-xs font-bold text-foreground leading-snug break-words">
+                {data.distanceEstimate || "Local / Remote"}
+              </p>
+            </div>
           </div>
         </div>
 

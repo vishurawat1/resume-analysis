@@ -10,6 +10,7 @@ export interface AnalysisMetadata {
   company?: string;
   location?: string;
   jobTitle?: string;
+  candidateLocation?: string;
 }
 
 export const getResumeAnalysisPrompt = (
@@ -23,6 +24,7 @@ Your objective is to perform an exceptionally rigorous, high-precision analysis 
 ${metadata?.company ? `Target Company: "${metadata.company}"` : ""}
 ${metadata?.location ? `Target Job Location: "${metadata.location}"` : ""}
 ${metadata?.jobTitle ? `Target Job Title: "${metadata.jobTitle}"` : ""}
+${metadata?.candidateLocation ? `Candidate's Home / Explicit Current Location: "${metadata.candidateLocation}" (CRITICAL: The candidate has confirmed this as their active residential location. Prioritize this as their home base for accurate distance, commute, and relocation calculations).` : ""}
 
 ### COMPREHENSIVE MULTI-DIMENSIONAL EVALUATION:
 
@@ -37,7 +39,7 @@ ${metadata?.jobTitle ? `Target Job Title: "${metadata.jobTitle}"` : ""}
    - "improvementImpact": Integer (10-25) estimated score gain if suggestions are accepted.
 
 2. LOCATION & COMMUTE INTELLIGENCE:
-   - Extract candidate's location from the resume (e.g. City, Country, or "Not specified").
+   - Candidate Location: If candidate's explicit home location is provided above, use it; otherwise extract candidate's location from the resume header (e.g. City, Country, or "Not specified").
    - Extract or use the target job location (from target metadata or JD).
    - Detect "workModel": "Remote" | "Hybrid" | "On-Site" | "Flexible" | "Unknown".
    - Evaluate "commuteFeasibility": "Local / Feasible" | "Manageable Commute" | "Relocation Required" | "Intercontinental / Remote Only" | "Out of this World / Unrealistic" | "Fully Remote".
