@@ -236,6 +236,11 @@ export default function UploadPage() {
                 updatedAt: new Date().toISOString()
               });
               
+              // Clear prior analysis session cache so new file triggers a fresh scan
+              sessionStorage.removeItem("aiResult");
+              sessionStorage.removeItem("analyzedResumeText");
+              sessionStorage.removeItem("analyzedJobDesc");
+
               // Also keep it in sessionStorage for backward compatibility/immediate synchronous access
               sessionStorage.setItem("resumeText", extractedText);
               sessionStorage.setItem("jobDescription", jobDescription);

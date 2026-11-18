@@ -13,7 +13,7 @@ import { CompanyIntelligenceCard, CompanyIntelligence } from "@/components/analy
 import { SeniorityMarketCard, SeniorityFit } from "@/components/analysis/SeniorityMarketCard";
 import { DownloadResumeButton } from "@/components/pdf/DownloadResumeButton";
 import { SaveAnalysisButton } from "@/components/analysis/SaveAnalysisButton";
-import { ChevronRight, FileText, Loader2, AlertCircle, Sparkles, Target, TrendingUp, FileEdit, ArrowRight } from "lucide-react";
+import { ChevronRight, FileText, Loader2, AlertCircle, Sparkles, Target, TrendingUp, FileEdit, ArrowRight, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
@@ -113,7 +113,25 @@ export default function AnalysisPage() {
       setRawResumeText(resumeText);
       setOptimizedResumeText(resumeText); // Initialize the optimized version
 
-      // Call Deep AI Analysis
+      // 1. Check if this exact resume and JD was already analyzed in this session
+      const cachedAiResultStr = sessionStorage.getItem("aiResult");
+      const cachedResume = sessionStorage.getItem("analyzedResumeText");
+      const cachedJd = sessionStorage.getItem("analyzedJobDesc");
+
+      if (cachedAiResultStr && cachedResume === resumeText && cachedJd === jobDescription) {
+        try {
+          const parsed = JSON.parse(cachedAiResultStr);
+          if (parsed && typeof parsed.overallScore === "number") {
+            setAiResult(parsed);
+            setIsAiLoading(false);
+            return; // Instant cache load
+          }
+        } catch {
+          // Fall through to network fetch
+        }
+      }
+
+      // 2. Call Deep AI Analysis
       setIsAiLoading(true);
       fetch("/api/analyze", {
         method: "POST",
@@ -127,6 +145,8 @@ export default function AnalysisPage() {
           } else {
             setAiResult(data);
             sessionStorage.setItem("aiResult", JSON.stringify(data));
+            sessionStorage.setItem("analyzedResumeText", resumeText);
+            sessionStorage.setItem("analyzedJobDesc", jobDescription);
           }
         })
         .catch((err) => {
@@ -138,6 +158,50 @@ export default function AnalysisPage() {
 
     fetchAnalysisData();
   }, [user, authLoading]);
+
+  const handleReanalyze = () => {
+    sessionStorage.removeItem("aiResult");
+    sessionStorage.removeItem("analyzedResumeText");
+    sessionStorage.removeItem("analyzedJobDesc");
+    setAiResult(null);
+    setAiError("");
+    setIsAiLoading(true);
+
+    const resumeText = sessionStorage.getItem("resumeText");
+    const jobDescription = sessionStorage.getItem("jobDescription");
+    const jobTitle = sessionStorage.getItem("jobTitle") || "";
+    const company = sessionStorage.getItem("company") || "";
+    const location = sessionStorage.getItem("location") || "";
+    const candidateLocation = sessionStorage.getItem("userHomeLocation") || "";
+
+    if (!resumeText || !jobDescription) {
+      setError("No resume or job description found to re-analyze.");
+      setIsAiLoading(false);
+      return;
+    }
+
+    fetch("/api/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resumeText, jobDescription, jobTitle, company, location, candidateLocation }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) {
+          setAiError(data.error);
+        } else {
+          setAiResult(data);
+          sessionStorage.setItem("aiResult", JSON.stringify(data));
+          sessionStorage.setItem("analyzedResumeText", resumeText);
+          sessionStorage.setItem("analyzedJobDesc", jobDescription);
+        }
+      })
+      .catch((err) => {
+        console.error("Re-analyze Fetch Error:", err);
+        setAiError("A network error occurred while re-analyzing.");
+      })
+      .finally(() => setIsAiLoading(false));
+  };
 
   const handleAcceptSuggestion = (original: string, improved: string) => {
     // Resiliently replace the original string with the improved version in our working draft
@@ -195,6 +259,15 @@ export default function AnalysisPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-2.5 print:hidden">
+          <button
+            onClick={handleReanalyze}
+            disabled={isAiLoading}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-border bg-card text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
+            title="Force fresh AI re-analysis against the job description"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 text-primary ${isAiLoading ? "animate-spin" : ""}`} />
+            <span>Re-analyze</span>
+          </button>
           <Link
             href="/dashboard/editor"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-foreground text-background text-xs font-bold hover:opacity-90 transition-all shadow-xs cursor-pointer"

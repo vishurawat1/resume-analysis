@@ -1,5 +1,7 @@
 "use client";
 
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer, Tooltip } from "recharts";
 
 const SUBJECT_DISPLAY_MAP: Record<string, string> = {
@@ -32,6 +34,15 @@ const FULL_NAME_MAP: Record<string, string> = {
 };
 
 export function ResumeRadarChart({ sectionScores }: { sectionScores: Record<string, number> }) {
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = mounted ? resolvedTheme === "dark" : false;
+
   const data = Object.entries(sectionScores || {}).map(([key, value]) => {
     const cleanKey = key.trim();
     const shortLabel = SUBJECT_DISPLAY_MAP[cleanKey] || (cleanKey.length > 10 ? `${cleanKey.slice(0, 8)}…` : cleanKey);
@@ -44,6 +55,15 @@ export function ResumeRadarChart({ sectionScores }: { sectionScores: Record<stri
     };
   });
 
+  // Dark & Light Mode Color Tokens (Eliminates invalid hsl(#hex) bug)
+  const gridStroke = isDark ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.12)";
+  const labelColor = isDark ? "#f4f4f5" : "#18181b";
+  const radarStroke = isDark ? "#38bdf8" : "#059669"; // Vibrant Cyan in dark mode, Emerald in light
+  const radarFill = isDark ? "#0284c7" : "#10b981";
+  const tooltipBg = isDark ? "#18181b" : "#ffffff";
+  const tooltipBorder = isDark ? "#27272a" : "#e4e4e7";
+  const tooltipText = isDark ? "#fafafa" : "#09090b";
+
   return (
     <div className="h-[310px] w-full flex items-center justify-center">
       <ResponsiveContainer width="100%" height="100%">
@@ -54,11 +74,11 @@ export function ResumeRadarChart({ sectionScores }: { sectionScores: Record<stri
           data={data}
           margin={{ top: 15, right: 32, bottom: 15, left: 32 }}
         >
-          <PolarGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
+          <PolarGrid stroke={gridStroke} strokeDasharray="3 3" />
           <PolarAngleAxis
             dataKey="subject"
             tick={{
-              fill: "hsl(var(--foreground))",
+              fill: labelColor,
               fontSize: 11,
               fontWeight: 600,
             }}
@@ -67,10 +87,10 @@ export function ResumeRadarChart({ sectionScores }: { sectionScores: Record<stri
           <Radar
             name="Score"
             dataKey="score"
-            stroke="hsl(var(--primary))"
-            fill="hsl(var(--primary))"
-            fillOpacity={0.35}
-            strokeWidth={2}
+            stroke={radarStroke}
+            fill={radarFill}
+            fillOpacity={isDark ? 0.45 : 0.35}
+            strokeWidth={2.5}
           />
           <Tooltip 
             formatter={(val: any, _name: any, item: any) => [
@@ -78,14 +98,14 @@ export function ResumeRadarChart({ sectionScores }: { sectionScores: Record<stri
               item?.payload?.fullSubject || "Score"
             ]}
             contentStyle={{
-              backgroundColor: 'hsl(var(--card))',
-              borderColor: 'hsl(var(--border))',
+              backgroundColor: tooltipBg,
+              borderColor: tooltipBorder,
               borderRadius: '8px',
-              color: 'hsl(var(--foreground))',
+              color: tooltipText,
               fontSize: '12px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+              boxShadow: '0 4px 12px rgba(0,0,0,0.25)'
             }}
-            itemStyle={{ color: 'hsl(var(--primary))', fontWeight: 600 }}
+            itemStyle={{ color: radarStroke, fontWeight: 600 }}
           />
         </RadarChart>
       </ResponsiveContainer>
