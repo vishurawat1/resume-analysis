@@ -34,61 +34,61 @@
   --radius-sm: calc(var(--radius) - 4px);
 }
 
-/* ── Light Mode (White & Light Green) ── */
+/* ── Light Mode (Clean Architectural Minimalist) ── */
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
+  --background: #fafafa;
+  --foreground: #09090b;
 
   --card: #ffffff;
-  --card-foreground: #0f172a;
+  --card-foreground: #09090b;
 
   --primary: #10b981; /* Emerald 500 */
   --primary-foreground: #ffffff;
 
-  --secondary: #f8fafc;
-  --secondary-foreground: #0f172a;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #09090b;
 
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
 
-  --accent: #ecfdf5; /* Emerald 50 */
-  --accent-foreground: #047857;
+  --accent: #f4f4f5;
+  --accent-foreground: #09090b;
 
   --destructive: #ef4444; /* Red 500 */
   --destructive-foreground: #ffffff;
 
-  --border: #e2e8f0;
-  --input: #e2e8f0;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
   --ring: #10b981;
 
-  --radius: 1rem;
+  --radius: 0.875rem;
 }
 
-/* ── Dark Mode (Black & Blue) ── */
+/* ── Dark Mode (Refined Deep Obsidian Minimalist) ── */
 .dark {
-  --background: #000000;
-  --foreground: #f8fafc;
+  --background: #09090b;
+  --foreground: #fafafa;
 
-  --card: #0f172a;
-  --card-foreground: #f8fafc;
+  --card: #121216;
+  --card-foreground: #fafafa;
 
   --primary: #3b82f6; /* Blue 500 */
   --primary-foreground: #ffffff;
 
-  --secondary: #1e293b;
-  --secondary-foreground: #f8fafc;
+  --secondary: #18181b;
+  --secondary-foreground: #fafafa;
 
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
 
-  --accent: #1e3a8a;
-  --accent-foreground: #bfdbfe;
+  --accent: #1e293b;
+  --accent-foreground: #fafafa;
 
   --destructive: #f87171; /* Red 400 */
-  --destructive-foreground: #0f172a;
+  --destructive-foreground: #09090b;
 
-  --border: #334155;
-  --input: #334155;
+  --border: #27272a;
+  --input: #27272a;
   --ring: #3b82f6;
 }
 
@@ -191,5 +191,30 @@ body {
   mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
   -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
 }
+
+.bg-grid-subtle {
+  background-image: radial-gradient(rgba(120, 119, 198, 0.12) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.dark .bg-grid-subtle {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.dark .glass-card {
+  background: rgba(18, 18, 22, 0.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 
 

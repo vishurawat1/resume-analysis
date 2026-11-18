@@ -2,110 +2,44 @@
 
 import React from "react";
 import { AutoScrollMarquee } from "./AutoScrollMarquee";
-import { CheckCircle2, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import { ShieldCheck, Check } from "lucide-react";
 
 const ATS_PLATFORMS = [
-  {
-    name: "Workday",
-    badge: "99.8% Ingest Rate",
-    iconColor: "text-blue-500",
-    bgAccent: "from-blue-500/10 to-indigo-500/10",
-    borderAccent: "border-blue-500/20",
-    highlight: "Multi-column Safe",
-  },
-  {
-    name: "Greenhouse",
-    badge: "Top Recruiter Choice",
-    iconColor: "text-emerald-500",
-    bgAccent: "from-emerald-500/10 to-teal-500/10",
-    borderAccent: "border-emerald-500/20",
-    highlight: "Keyword Density Tuned",
-  },
-  {
-    name: "Lever",
-    badge: "Semantic Match 98%",
-    iconColor: "text-amber-500",
-    bgAccent: "from-amber-500/10 to-orange-500/10",
-    borderAccent: "border-amber-500/20",
-    highlight: "Role Specific Fit",
-  },
-  {
-    name: "Ashby",
-    badge: "Next-Gen ATS Ready",
-    iconColor: "text-purple-500",
-    bgAccent: "from-purple-500/10 to-violet-500/10",
-    borderAccent: "border-purple-500/20",
-    highlight: "Fast-Track Candidate",
-  },
-  {
-    name: "BambooHR",
-    badge: "Full Extraction",
-    iconColor: "text-green-600",
-    bgAccent: "from-green-500/10 to-emerald-500/10",
-    borderAccent: "border-green-500/20",
-    highlight: "0 Parsing Collisions",
-  },
-  {
-    name: "Oracle Taleo",
-    badge: "Legacy Filter Bypassed",
-    iconColor: "text-rose-500",
-    bgAccent: "from-rose-500/10 to-red-500/10",
-    borderAccent: "border-rose-500/20",
-    highlight: "Strict Headers Passed",
-  },
-  {
-    name: "SmartRecruiters",
-    badge: "Top Tier Scoring",
-    iconColor: "text-cyan-500",
-    bgAccent: "from-cyan-500/10 to-blue-500/10",
-    borderAccent: "border-cyan-500/20",
-    highlight: "Skills Matrix Aligned",
-  },
-  {
-    name: "iCIMS Cloud",
-    badge: "Enterprise Tested",
-    iconColor: "text-indigo-500",
-    bgAccent: "from-indigo-500/10 to-sky-500/10",
-    borderAccent: "border-indigo-500/20",
-    highlight: "Certified Compatible",
-  },
+  { name: "Workday", spec: "99.8% Parse Ingest" },
+  { name: "Greenhouse", spec: "Semantic Ranking Top 5%" },
+  { name: "Lever", spec: "Keyword Saturation Tested" },
+  { name: "Ashby", spec: "Single-Column Safe" },
+  { name: "BambooHR", spec: "Zero Parsing Glitches" },
+  { name: "Oracle Taleo", spec: "Legacy Header Bypassed" },
+  { name: "SmartRecruiters", spec: "Skills Matrix Aligned" },
+  { name: "iCIMS", spec: "Enterprise Verified" },
 ];
 
 export function AtsPlatformsMarquee() {
   return (
-    <div className="w-full py-10 relative overflow-hidden bg-background/50 backdrop-blur-sm border-y border-border/60">
-      <div className="container mx-auto px-4 mb-5 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 mb-2">
-          <ShieldCheck className="w-3.5 h-3.5" />
-          Cross-Platform Compatibility
-        </div>
-        <p className="text-xs md:text-sm text-muted-foreground font-medium">
-          Engineered and battle-tested against the algorithms powering leading ATS & recruiter screening suites
+    <div className="w-full py-8 relative overflow-hidden bg-background border-y border-border/50">
+      <div className="container mx-auto px-4 mb-4 text-center">
+        <p className="text-[11px] uppercase font-bold tracking-widest text-muted-foreground/80 flex items-center justify-center gap-2">
+          <ShieldCheck className="w-3.5 h-3.5 text-primary" />
+          <span>Validated against Tier-1 Applicant Tracking Systems</span>
         </p>
       </div>
 
-      <AutoScrollMarquee speed="normal" direction="left" className="py-2">
+      <AutoScrollMarquee speed="normal" direction="left" className="py-1">
         {ATS_PLATFORMS.map((platform) => (
           <div
             key={platform.name}
-            className={`group relative flex items-center gap-3.5 px-5 py-3 rounded-xl bg-card border ${platform.borderAccent} hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 select-none cursor-default`}
+            className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-card/60 dark:bg-card/40 border border-border/60 hover:border-border select-none cursor-default text-xs transition-colors"
           >
-            <div className={`p-2 rounded-lg bg-gradient-to-br ${platform.bgAccent} ${platform.iconColor}`}>
-              <CheckCircle2 className="w-4 h-4" />
+            <div className="w-4 h-4 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+              <Check className="w-2.5 h-2.5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm text-foreground tracking-tight">
-                  {platform.name}
-                </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-muted text-muted-foreground group-hover:bg-primary/15 group-hover:text-primary transition-colors">
-                  {platform.highlight}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground font-normal">
-                {platform.badge}
-              </p>
-            </div>
+            <span className="font-semibold text-foreground tracking-tight">
+              {platform.name}
+            </span>
+            <span className="text-[10px] font-mono text-muted-foreground">
+              • {platform.spec}
+            </span>
           </div>
         ))}
       </AutoScrollMarquee>

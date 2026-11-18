@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,360 +18,489 @@ import {
   Check, 
   SlidersHorizontal,
   Briefcase,
-  AlertTriangle
+  AlertTriangle,
+  Play,
+  Pause,
+  Info
 } from "lucide-react";
+
+interface Hotspot {
+  id: string;
+  x: number; // percentage
+  y: number; // percentage
+  label: string;
+  title: string;
+  detail: string;
+  accent: string;
+}
 
 interface ShowcaseTab {
   id: string;
   title: string;
-  shortTitle: string;
-  tag: string;
+  badge: string;
   image: string;
   alt: string;
-  summary: string;
+  headline: string;
+  hotspots: Hotspot[];
   features: {
     icon: React.ElementType;
     title: string;
     description: string;
-    accent: string;
-    badge?: string;
+    metric?: string;
   }[];
 }
 
 const SHOWCASE_TABS: ShowcaseTab[] = [
   {
     id: "ats-intelligence",
-    title: "ATS Scoring & Commute Radar",
-    shortTitle: "ATS & Commute",
-    tag: "Real Scan: 83 Score • ~2,000 km Relocation",
+    title: "ATS Score & Commute Radar",
+    badge: "Score: 83 • ~2,000 km Distance",
     image: "/screenshots/ats-performance-report.png",
     alt: "AI Resume Analyzer ATS Performance Report and Commute Radar",
-    summary: "Comprehensive multi-vector diagnostic simulating Tier-1 ATS parsers (Workday, Greenhouse, Lever) paired with Company Legitimacy and Relocation Radar.",
+    headline: "Simulate Workday & Greenhouse parsers with verified employer and commute reality checks.",
+    hotspots: [
+      {
+        id: "score-pin",
+        x: 27,
+        y: 30,
+        label: "ATS 83",
+        title: "Overall ATS Score (83/100)",
+        detail: "Strict Workday/Lever algorithm simulation. Ranks in the top 15% tier with a potential target of 95.",
+        accent: "bg-emerald-500",
+      },
+      {
+        id: "company-pin",
+        x: 32,
+        y: 72,
+        label: "Scam Shield",
+        title: "Company Legitimacy (45% Legit)",
+        detail: "Flags phantom startup footprint and unverified domains before you invest interview prep.",
+        accent: "bg-amber-500",
+      },
+      {
+        id: "commute-pin",
+        x: 68,
+        y: 72,
+        label: "Distance Radar",
+        title: "Commute & Relocation (~2,000 km)",
+        detail: "Calculates distance from Bangalore to Dehradun. Alerts candidate to negotiate relocation or full remote.",
+        accent: "bg-blue-500",
+      },
+    ],
     features: [
       {
         icon: Gauge,
-        title: "Workday-Grade Overall ATS Score",
-        description: "Simulates actual enterprise ATS parsers, computing a strict 0–100 match against the target job posting.",
-        accent: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
-        badge: "83 / 100",
-      },
-      {
-        icon: MapPin,
-        title: "Commute & Relocation Radar",
-        description: "Compares your residence with target job location (e.g. Bangalore to Dehradun, ~2,000 km). Flags daily commute impossibilities and gives witty reality checks if someone enters 'Space' or fantasy locations!",
-        accent: "text-blue-500 bg-blue-500/10 border-blue-500/20",
-        badge: "Smart Distance",
+        title: "ATS Scoring Simulation",
+        description: "Evaluates exact keyword saturation, section layout, and font extractability.",
+        metric: "83 / 100",
       },
       {
         icon: ShieldCheck,
-        title: "Company Legitimacy & Scam Shield",
-        description: "Evaluates the hiring company's corporate footprint, flagging phantom postings, unverified startups, and scam danger signs before you invest effort.",
-        accent: "text-amber-500 bg-amber-500/10 border-amber-500/20",
-        badge: "Scam Protection",
+        title: "Company Scam Shield",
+        description: "Scans corporate records, email domains, and job syntax to prevent phantom job traps.",
+        metric: "45% Legit",
       },
       {
-        icon: SlidersHorizontal,
-        title: "6-Vector Radar Diagnostic",
-        description: "Visualizes structural health across Experience, Skills, Education, Projects, Formatting, and Keyword Optimization in a single balanced chart.",
-        accent: "text-purple-500 bg-purple-500/10 border-purple-500/20",
-        badge: "Hexagonal Radar",
+        icon: MapPin,
+        title: "Commute & Relocation",
+        description: "Identifies true geographic feasibility and provides witty reality checks for impossible locations.",
+        metric: "~2,000 km",
       },
     ],
   },
   {
     id: "role-fit-benchmarks",
     title: "Role Fit & Market Benchmarking",
-    shortTitle: "Role Fit & Salary",
-    tag: "Real Scan: 85% Keyword Match • Entry to Junior",
+    badge: "85% Keyword Match • Junior to Entry",
     image: "/screenshots/role-fit-benchmarks.png",
     alt: "AI Role Fit Analysis, Seniority Level, and Market Compensation Benchmarks",
-    summary: "Deep contextual appraisal of your seniority fit, realistic market compensation ranges, missing critical keywords, and balanced strengths vs weaknesses.",
+    headline: "Compare candidate seniority, benchmark real market compensation, and uncover recruiter blind spots.",
+    hotspots: [
+      {
+        id: "role-fit-pin",
+        x: 35,
+        y: 28,
+        label: "Role Fit",
+        title: "Contextual Role Fit Appraisal",
+        detail: "Deep narrative evaluating technical ceiling, MERN stack depth, and team collaboration abilities.",
+        accent: "bg-blue-500",
+      },
+      {
+        id: "salary-pin",
+        x: 76,
+        y: 28,
+        label: "Market Rate",
+        title: "Market Compensation Range",
+        detail: "Stipend benchmark: $1,500 – $2,500/mo. Perfect seniority match (Junior 0-2 yrs vs Entry-Level).",
+        accent: "bg-emerald-500",
+      },
+      {
+        id: "weakness-pin",
+        x: 30,
+        y: 80,
+        label: "Gaps Audit",
+        title: "Critical Weaknesses Audit",
+        detail: "Flags missing 'debugging' keywords and unstated hybrid work preferences before recruiters do.",
+        accent: "bg-rose-500",
+      },
+    ],
     features: [
       {
         icon: Target,
-        title: "Contextual Role Fit Appraisal",
-        description: "Evaluates your technical ceiling and team synergy instead of simple keyword-counting, explaining exactly why you fit or exceed requirements.",
-        accent: "text-blue-500 bg-blue-500/10 border-blue-500/20",
-        badge: "Contextual AI",
+        title: "Contextual Suitability",
+        description: "Analyzes actual technical ceiling and collaboration readiness beyond simple word matching.",
+        metric: "High Fit",
       },
       {
         icon: DollarSign,
-        title: "Seniority & Market Salary Intelligence",
-        description: "Compares candidate seniority (e.g. Junior 0-2 yrs) against target job level, and estimates realistic market salary and stipend ranges.",
-        accent: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
-        badge: "Market Rate",
+        title: "Salary Benchmarking",
+        description: "Real-time compensation guidance tailored to candidate level and target company tier.",
+        metric: "$1.5k–$2.5k",
       },
       {
         icon: AlertTriangle,
-        title: "Missing ATS Keyword Detector",
-        description: "Detects crucial missing terms (e.g. 'Debugging', 'Hybrid work') that algorithms require to pass your application to the recruiter review stage.",
-        accent: "text-rose-500 bg-rose-500/10 border-rose-500/20",
-        badge: "Keyword Audit",
-      },
-      {
-        icon: Briefcase,
-        title: "Honest Strengths vs Weaknesses",
-        description: "Presents an unvarnished breakdown of your standout achievements alongside points interviewers will likely challenge.",
-        accent: "text-cyan-500 bg-cyan-500/10 border-cyan-500/20",
-        badge: "Recruiter Lens",
+        title: "Missing Keyword Radar",
+        description: "Highlights high-priority recruiter filter keywords absent from the candidate resume.",
+        metric: "85% Match",
       },
     ],
   },
   {
     id: "bullet-studio",
     title: "Interactive AI Bullet Optimizer",
-    shortTitle: "1-Click AI Bullets",
-    tag: "Real Scan: Quantified Metric Enhancements",
+    badge: "Metric-Driven Rewrites • Vector PDF",
     image: "/screenshots/interactive-bullet-improvements.png",
     alt: "Interactive AI Improvements Studio with Before and After Resume Bullets",
-    summary: "Review AI-generated bullet rewrites that convert passive job descriptions into metric-packed achievements recruiters notice, then export a clean vector PDF.",
+    headline: "Transform passive job duties into quantifiable achievements with 1-click accept and instant vector PDF export.",
+    hotspots: [
+      {
+        id: "impact-pin",
+        x: 18,
+        y: 18,
+        label: "High Impact",
+        title: "Impact Priority Classification",
+        detail: "Categorizes rewrites into High vs Medium impact so candidates focus on top recruiter drivers.",
+        accent: "bg-blue-500",
+      },
+      {
+        id: "diff-pin",
+        x: 48,
+        y: 35,
+        label: "1-Click Fix",
+        title: "Quantified Accomplishments",
+        detail: "Injected 25% user-engagement metric and eliminated fluff, optimizing for 6-second recruiter scans.",
+        accent: "bg-emerald-500",
+      },
+      {
+        id: "why-pin",
+        x: 48,
+        y: 48,
+        label: "Recruiter Why",
+        title: "Algorithmic Reasoning",
+        detail: "Explains why the rewrite works: clarifies action-result structure and reinforces ATS keywords.",
+        accent: "bg-purple-500",
+      },
+    ],
     features: [
       {
         icon: Sparkles,
-        title: "Quantified Metric Injection",
-        description: "Transforms vague phrases into high-impact accomplishments featuring exact percentages, latency reductions, and user engagement numbers.",
-        accent: "text-amber-500 bg-amber-500/10 border-amber-500/20",
-        badge: "Quantified Impact",
+        title: "Quantified Metrics",
+        description: "Instantly injects percentages, latency improvements, and concrete outcomes into bullets.",
+        metric: "+25% Impact",
       },
       {
         icon: CheckCircle2,
-        title: "1-Click Accept or Dismiss",
-        description: "Review suggestions with full autonomy. Accepting an improvement automatically updates your resume draft in real time.",
-        accent: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
-        badge: "Instant Apply",
-      },
-      {
-        icon: Target,
-        title: "Transparent 'Why' Explanations",
-        description: "Explains the psychological and algorithmic reason for each rewrite—such as eliminating redundancy or foregrounding ROI.",
-        accent: "text-purple-500 bg-purple-500/10 border-purple-500/20",
-        badge: "Recruiter Logic",
+        title: "1-Click Accept",
+        description: "Full candidate control. Accept or dismiss individual suggestions to update the draft live.",
+        metric: "Real-time",
       },
       {
         icon: Check,
-        title: "ATS-Engineered Vector PDF Output",
-        description: "Export the finalized resume as a clean, single-page vector PDF built on industry-standard typography with clickable contact links.",
-        accent: "text-blue-500 bg-blue-500/10 border-blue-500/20",
-        badge: "Executive PDF",
+        title: "Vector PDF Export",
+        description: "Pure Helvetica vector document with clean typography and clickable contact links.",
+        metric: "ATS Proof",
       },
     ],
   },
 ];
 
+const AUTOPLAY_DURATION = 6500; // ms per tab
+
 export function AppExperienceShowcase() {
   const [activeTab, setActiveTab] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [activeHotspot, setActiveHotspot] = useState<Hotspot | null>(null);
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
+
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number>(Date.now());
+
+  // Dynamic autoplay progress ticker
+  useEffect(() => {
+    if (isPaused) return;
+
+    const interval = 50; // tick every 50ms
+    timerRef.current = setInterval(() => {
+      setProgress((prev) => {
+        const next = prev + (interval / AUTOPLAY_DURATION) * 100;
+        if (next >= 100) {
+          setActiveTab((cur) => (cur + 1) % SHOWCASE_TABS.length);
+          setActiveHotspot(null);
+          return 0;
+        }
+        return next;
+      });
+    }, interval);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isPaused, activeTab]);
+
+  const handleSelectTab = (idx: number) => {
+    setActiveTab(idx);
+    setProgress(0);
+    setActiveHotspot(null);
+  };
 
   const currentTab = SHOWCASE_TABS[activeTab];
 
   return (
-    <section id="app-tour" className="py-24 relative overflow-hidden bg-background border-t border-border">
-      {/* Background ambient lighting */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+    <section id="app-tour" className="py-24 relative overflow-hidden bg-background">
+      {/* Background ambient gradient glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[450px] bg-primary/[0.04] dark:bg-primary/[0.07] rounded-full blur-[140px] pointer-events-none" />
 
-      <div className="container mx-auto px-4 md:px-6 max-w-7xl relative z-10">
+      <div className="container mx-auto px-4 md:px-6 max-w-6xl relative z-10">
         
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-12">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20 mb-4 shadow-xs">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Interactive Product Experience</span>
+        <div className="text-center max-w-2xl mx-auto mb-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground border border-border mb-3">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Interactive Product Tour</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-foreground tracking-tight mb-5 leading-tight">
-            See the exact AI intelligence{" "}
-            <span className="bg-gradient-to-r from-primary via-emerald-400 to-blue-500 bg-clip-text text-transparent">
-              before you upload
-            </span>
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight mb-3">
+            Real scans. Zero generic AI fluff.
           </h2>
-          <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
-            Unlike generic AI tools that just regurgitate synonyms, our platform gives you deep ATS scoring, company legitimacy checks, commute reality radar, and 1-click bullet point enhancements.
+          <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+            See the actual intelligence engine in action. Hover over any glowing pin on the screen to inspect live metrics.
           </p>
         </div>
 
-        {/* Tab Selection Bar */}
-        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-10">
-          {SHOWCASE_TABS.map((tab, idx) => {
-            const isActive = activeTab === idx;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(idx)}
-                className={`relative px-4 sm:px-6 py-3 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center gap-2 border ${
-                  isActive
-                    ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/25 scale-[1.02]"
-                    : "bg-card hover:bg-muted text-muted-foreground hover:text-foreground border-border hover:border-border/80"
-                }`}
-              >
-                <span>{tab.title}</span>
-                <span className={`hidden sm:inline-block text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
-                  isActive ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
-                }`}>
-                  {idx + 1}
-                </span>
-              </button>
-            );
-          })}
+        {/* Dynamic Tab Selector Bar with Integrated Hairline Progress Bar */}
+        <div 
+          className="flex flex-col sm:flex-row items-center justify-center gap-2 mb-8"
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}
+        >
+          <div className="inline-flex p-1.5 rounded-2xl bg-muted/60 dark:bg-muted/40 border border-border backdrop-blur-md">
+            {SHOWCASE_TABS.map((tab, idx) => {
+              const isActive = activeTab === idx;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleSelectTab(idx)}
+                  className={`relative px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer select-none flex items-center gap-2 overflow-hidden ${
+                    isActive
+                      ? "bg-card text-foreground shadow-xs border border-border/80"
+                      : "text-muted-foreground hover:text-foreground hover:bg-card/40"
+                  }`}
+                >
+                  <span>{tab.title}</span>
+
+                  {/* Active Hairline Progress Timer Bar */}
+                  {isActive && (
+                    <motion.div
+                      className="absolute bottom-0 left-0 h-[2.5px] bg-primary"
+                      style={{ width: `${progress}%` }}
+                      transition={{ ease: "linear", duration: 0.05 }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Pause / Play Indicator Pill */}
+          <button
+            onClick={() => setIsPaused(!isPaused)}
+            className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors text-xs flex items-center gap-1.5 cursor-pointer"
+            title={isPaused ? "Resume auto-rotation" : "Pause auto-rotation"}
+          >
+            {isPaused ? <Play className="w-3.5 h-3.5 text-primary" /> : <Pause className="w-3.5 h-3.5" />}
+            <span className="text-[11px] font-mono hidden md:inline">{isPaused ? "Paused" : "Auto-playing"}</span>
+          </button>
         </div>
 
-        {/* Tab Summary Tag */}
+        {/* Headline for Active Tab */}
         <div className="text-center mb-6">
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground border border-border">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            {currentTab.tag}
-          </span>
+          <p className="text-xs sm:text-sm text-muted-foreground font-medium max-w-xl mx-auto">
+            {currentTab.headline}
+          </p>
         </div>
 
-        {/* Main Showcase Device Mockup */}
-        <div className="relative rounded-2xl md:rounded-3xl border border-border bg-card/90 shadow-2xl backdrop-blur-md overflow-hidden p-2 sm:p-4 md:p-6 mb-12">
-          
-          {/* macOS Browser Window Header */}
-          <div className="flex items-center justify-between px-3 py-2.5 mb-3 rounded-xl bg-muted/40 border border-border/60 text-xs">
-            {/* Traffic Lights */}
+        {/* macOS Frame with Interactive Live Screenshot */}
+        <div 
+          className="relative rounded-2xl md:rounded-3xl border border-border/80 bg-card/60 dark:bg-[#111116]/80 backdrop-blur-xl shadow-2xl p-2.5 sm:p-4 md:p-6 overflow-hidden mb-8"
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}
+        >
+          {/* Top macOS Browser Window Bar */}
+          <div className="flex items-center justify-between px-3 py-2 mb-3 rounded-xl bg-muted/40 border border-border/60 text-xs">
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-rose-500/80 inline-block" />
-              <span className="w-3 h-3 rounded-full bg-amber-500/80 inline-block" />
-              <span className="w-3 h-3 rounded-full bg-emerald-500/80 inline-block" />
+              <span className="w-2.5 h-2.5 rounded-full bg-neutral-400/50 dark:bg-neutral-600 inline-block" />
+              <span className="w-2.5 h-2.5 rounded-full bg-neutral-400/50 dark:bg-neutral-600 inline-block" />
+              <span className="w-2.5 h-2.5 rounded-full bg-neutral-400/50 dark:bg-neutral-600 inline-block" />
             </div>
 
-            {/* URL Bar */}
-            <div className="flex items-center gap-2 px-4 py-1 rounded-lg bg-background/80 border border-border/80 text-[11px] font-mono text-muted-foreground max-w-sm sm:max-w-md w-full justify-center">
-              <span className="text-emerald-500 text-[10px] font-bold">🔒 https://</span>
-              <span className="text-foreground font-medium truncate">vr-resume-analysis.vercel.app/dashboard/analysis</span>
+            <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-md bg-background/60 border border-border/60 text-[11px] font-mono text-muted-foreground">
+              <span className="text-emerald-500 font-bold">●</span>
+              <span className="truncate max-w-[200px] sm:max-w-none">vr-resume-analysis.vercel.app/dashboard/analysis</span>
             </div>
 
-            {/* Enlarge Button */}
             <button
               onClick={() => setEnlargedImage(currentTab.image)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-background border border-border text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title="Click to inspect full resolution"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-background/80 border border-border text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
               <Maximize2 className="w-3 h-3" />
               <span className="hidden sm:inline">Enlarge</span>
             </button>
           </div>
 
-          {/* Screenshot Display with Animated Transition */}
-          <div className="relative rounded-xl overflow-hidden border border-border/80 bg-slate-950 group">
+          {/* Screenshot Display with Dynamic Interactive Hotspot Pins */}
+          <div className="relative rounded-xl overflow-hidden border border-border/70 bg-neutral-950">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentTab.id}
-                initial={{ opacity: 0, scale: 0.98 }}
+                initial={{ opacity: 0, scale: 0.99 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.35, ease: "easeOut" }}
-                className="relative aspect-[16/10] w-full cursor-pointer overflow-hidden"
-                onClick={() => setEnlargedImage(currentTab.image)}
+                exit={{ opacity: 0, scale: 0.99 }}
+                transition={{ duration: 0.3 }}
+                className="relative aspect-[16/10] w-full select-none"
               >
                 <Image
                   src={currentTab.image}
                   alt={currentTab.alt}
                   fill
                   sizes="(max-width: 1200px) 100vw, 1200px"
-                  className="object-cover object-top transition-transform duration-500 group-hover:scale-[1.01]"
+                  className="object-cover object-top"
                   priority={activeTab === 0}
                 />
 
-                {/* Subtle Hover Overlay Hint */}
-                <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
-                  <span className="px-4 py-2 rounded-xl bg-background/90 text-foreground text-xs font-semibold shadow-lg backdrop-blur-md flex items-center gap-2 border border-border">
-                    <Maximize2 className="w-4 h-4 text-primary" />
-                    Click to Inspect Full High-Res Screen
-                  </span>
-                </div>
+                {/* Subtle gradient vignette */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+
+                {/* Interactive Hotspot Pins */}
+                {currentTab.hotspots.map((pin) => {
+                  const isPinActive = activeHotspot?.id === pin.id;
+                  return (
+                    <div
+                      key={pin.id}
+                      style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 z-30"
+                      onMouseEnter={() => {
+                        setIsPaused(true);
+                        setActiveHotspot(pin);
+                      }}
+                      onMouseLeave={() => setActiveHotspot(null)}
+                      onClick={() => setActiveHotspot(isPinActive ? null : pin)}
+                    >
+                      {/* Pulse Ring */}
+                      <span className={`absolute -inset-1.5 rounded-full ${pin.accent} opacity-40 animate-ping pointer-events-none`} />
+                      
+                      {/* Pin Trigger Button */}
+                      <button
+                        className={`relative flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-tight text-white shadow-xl backdrop-blur-md transition-all duration-200 cursor-pointer border border-white/40 ${
+                          isPinActive ? "scale-110 ring-2 ring-white" : "hover:scale-105"
+                        } ${pin.accent}`}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                        <span>{pin.label}</span>
+                      </button>
+
+                      {/* Hotspot Floating Insight Card */}
+                      <AnimatePresence>
+                        {isPinActive && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-64 p-3.5 rounded-xl bg-neutral-900/95 text-white border border-neutral-700/80 shadow-2xl backdrop-blur-xl z-40 text-left pointer-events-none"
+                          >
+                            <div className="flex items-center gap-1.5 mb-1 text-[11px] font-bold text-white">
+                              <Info className="w-3.5 h-3.5 text-primary" />
+                              <span>{pin.title}</span>
+                            </div>
+                            <p className="text-[11px] text-neutral-300 leading-relaxed font-normal">
+                              {pin.detail}
+                            </p>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
               </motion.div>
             </AnimatePresence>
           </div>
         </div>
 
-        {/* Feature Cards Grid for Active Tab */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {currentTab.features.map((feat, idx) => {
+        {/* Minimalist 3-Feature Metrics Row for Active Tab */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {currentTab.features.map((feat) => {
             const Icon = feat.icon;
             return (
-              <motion.div
+              <div
                 key={feat.title}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: idx * 0.08 }}
-                className="rounded-2xl border border-border bg-card p-6 flex flex-col justify-between shadow-xs hover:shadow-md hover:border-primary/40 transition-all duration-300 group"
+                className="rounded-xl border border-border/70 bg-card/60 backdrop-blur-md p-4 flex items-center justify-between gap-3 hover:border-border transition-colors"
               >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className={`p-2.5 rounded-xl border ${feat.accent} group-hover:scale-110 transition-transform duration-300`}>
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    {feat.badge && (
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
-                        {feat.badge}
-                      </span>
-                    )}
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-muted text-foreground shrink-0">
+                    <Icon className="w-4 h-4 text-primary" />
                   </div>
-                  <h3 className="font-bold text-foreground text-base mb-2 group-hover:text-primary transition-colors">
-                    {feat.title}
-                  </h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                    {feat.description}
-                  </p>
+                  <div>
+                    <h3 className="font-semibold text-foreground text-xs sm:text-sm">
+                      {feat.title}
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      {feat.description}
+                    </p>
+                  </div>
                 </div>
-              </motion.div>
+
+                {feat.metric && (
+                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-muted text-foreground border border-border shrink-0">
+                    {feat.metric}
+                  </span>
+                )}
+              </div>
             );
           })}
         </div>
 
-        {/* Action Callout Bar */}
-        <div className="mt-12 p-6 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-card to-background flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3 text-left">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold shadow-xs">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="font-bold text-foreground text-sm sm:text-base">
-                Ready to see your own resume breakdown?
-              </p>
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                Get your full ATS score, commute analysis, and scam check in under 60 seconds.
-              </p>
-            </div>
-          </div>
-          <Link
-            href="/dashboard/upload"
-            className="w-full sm:w-auto shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md hover:shadow-primary/25 hover:-translate-y-0.5"
-          >
-            <span>Scan Your Resume Free</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-
       </div>
 
-      {/* Lightbox Modal for Full Resolution Screenshot */}
+      {/* Lightbox Modal */}
       <AnimatePresence>
         {enlargedImage && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md p-4 sm:p-8 flex flex-col items-center justify-center"
+            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md p-4 sm:p-8 flex flex-col items-center justify-center cursor-pointer"
             onClick={() => setEnlargedImage(null)}
           >
-            <div className="relative w-full max-w-6xl max-h-[90vh] flex flex-col items-center">
-              {/* Close Button */}
+            <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEnlargedImage(null);
-                }}
-                className="self-end mb-3 p-2 rounded-xl bg-slate-900/90 text-white hover:bg-slate-800 border border-slate-700 transition-colors shadow-lg flex items-center gap-1.5 text-xs font-semibold"
+                onClick={() => setEnlargedImage(null)}
+                className="self-end mb-3 p-2 rounded-xl bg-neutral-900 text-white hover:bg-neutral-800 border border-neutral-700 transition-colors shadow-lg flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
               >
                 <X className="w-4 h-4" />
-                <span>Close Preview</span>
+                <span>Close</span>
               </button>
 
-              {/* Large Image Container */}
-              <div 
-                className="relative w-full aspect-[16/10] max-h-[82vh] rounded-2xl overflow-hidden border border-border shadow-2xl bg-black"
-                onClick={(e) => e.stopPropagation()}
-              >
+              <div className="relative w-full aspect-[16/10] max-h-[82vh] rounded-2xl overflow-hidden border border-neutral-800 shadow-2xl bg-black">
                 <Image
                   src={enlargedImage}
                   alt="High Resolution Screenshot Preview"
