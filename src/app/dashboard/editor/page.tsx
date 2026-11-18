@@ -29,9 +29,16 @@ import {
   FileCheck2,
   Gauge,
   Copy,
-  CornerDownLeft,
+  ChevronUp,
   ChevronDown,
-  RefreshCw
+  Columns2,
+  UploadCloud,
+  Printer,
+  Palette,
+  LayoutTemplate,
+  Sliders,
+  Maximize2,
+  RotateCcw
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
@@ -57,7 +64,7 @@ function AutoResizeTextarea({
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.max(textareaRef.current.scrollHeight, 20)}px`;
+      textareaRef.current.style.height = `${Math.max(textareaRef.current.scrollHeight, 22)}px`;
     }
   }, [value]);
 
@@ -73,7 +80,7 @@ function AutoResizeTextarea({
   );
 }
 
-// ── Auto-Width Input for Header Contact Bar (Prevents orphan wrapping and clipping) ──
+// ── Auto-Width Input for Header Contact Bar ──
 function AutoWidthInput({
   value,
   onChange,
@@ -98,7 +105,7 @@ function AutoWidthInput({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       style={{ width: widthCh }}
-      className={`text-center hover:bg-neutral-100 focus:bg-blue-50 focus:outline-none rounded px-1 transition-all ${
+      className={`text-center hover:bg-neutral-100 focus:bg-blue-50 focus:outline-none rounded px-1.5 py-0.5 transition-all ${
         isLink ? "text-neutral-900 underline decoration-neutral-300" : "text-neutral-800"
       } ${className || ""}`}
     />
@@ -115,6 +122,7 @@ const DEFAULT_RESUME_DATA: ResumeData = {
     github: "github.com/alexrivera",
     portfolio: "alexrivera.dev",
   },
+  summary: "Results-driven Software Engineer with 5+ years of experience engineering high-scale distributed systems, event-driven architectures, and high-performance web applications.",
   education: [
     {
       institution: "University of California, Berkeley",
@@ -173,13 +181,18 @@ const DEFAULT_RESUME_DATA: ResumeData = {
       category: "Cloud & Developer Tools",
       items: ["Docker", "Kubernetes", "AWS (ECS, S3, RDS)", "Git", "CI/CD", "Redis", "Kafka"]
     }
-  ]
+  ],
+  customSections: []
 };
 
-const TEMPLATES = [
-  { id: "jakes", name: "Jake's ATS Classic (Overleaf)", font: "font-serif", border: "border-neutral-900" },
-  { id: "harvard", name: "Harvard Academic", font: "font-serif", border: "border-neutral-900" },
-  { id: "modern", name: "Modern Compact", font: "font-sans", border: "border-neutral-900" },
+type SectionKey = "summary" | "education" | "experience" | "projects" | "skills" | "certifications" | "custom";
+
+const COLOR_THEMES = [
+  { id: "black", name: "Noir Black", border: "border-neutral-900", text: "text-neutral-900", line: "#000000" },
+  { id: "navy", name: "Executive Navy", border: "border-blue-900", text: "text-blue-900", line: "#1e3a8a" },
+  { id: "emerald", name: "Modern Emerald", border: "border-emerald-800", text: "text-emerald-800", line: "#065f46" },
+  { id: "burgundy", name: "Classic Crimson", border: "border-rose-900", text: "text-rose-900", line: "#881337" },
+  { id: "slate", name: "Slate Minimal", border: "border-slate-800", text: "text-slate-800", line: "#1e293b" },
 ];
 
 export default function ResumeEditorPage() {
@@ -191,13 +204,32 @@ export default function ResumeEditorPage() {
   const [isPdfGenerating, setIsPdfGenerating] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Template & Customization
-  const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
+  // Canva Styling Controls
+  const [fontFamily, setFontFamily] = useState<"times" | "sans" | "georgia">("times");
+  const [colorTheme, setColorTheme] = useState(COLOR_THEMES[0]);
+  const [layoutMode, setLayoutMode] = useState<"single" | "two-column">("single");
+  const [spacingMode, setSpacingMode] = useState<"compact" | "normal" | "relaxed">("normal");
   const [zoomScale, setZoomScale] = useState(100);
+
+  // Section Ordering (Canva Freedom: move any section up/down, delete, add custom)
+  const [sectionOrder, setSectionOrder] = useState<SectionKey[]>([
+    "summary",
+    "education",
+    "experience",
+    "projects",
+    "skills",
+    "custom"
+  ]);
+
+  // Original Uploaded Resume Comparison (Split View)
+  const [showSplitView, setShowSplitView] = useState(false);
+  const [uploadedPdfUrl, setUploadedPdfUrl] = useState<string | null>(null);
+  const [uploadedRawText, setUploadedRawText] = useState<string>("");
 
   // Drawers
   const [showAiDrawer, setShowAiDrawer] = useState(false);
   const [showJdDrawer, setShowJdDrawer] = useState(false);
+  const [showStyleMenu, setShowStyleMenu] = useState(false);
 
   // AI & JD Context
   const [aiSuggestions, setAiSuggestions] = useState<Suggestion[]>([]);
@@ -213,7 +245,7 @@ export default function ResumeEditorPage() {
 
   // Active Bullet Target for Contextual AI Rewrites
   const [activeBulletTarget, setActiveBulletTarget] = useState<{
-    section: "experience" | "projects";
+    section: "experience" | "projects" | "custom";
     entryIdx: number;
     bulletIdx: number;
     text: string;
@@ -232,6 +264,7 @@ export default function ResumeEditorPage() {
         const cachedStructured = sessionStorage.getItem("resumeStructuredData");
         const cachedText = sessionStorage.getItem("resumeText");
         const cachedAiResult = sessionStorage.getItem("aiResult");
+        const cachedPdfUrl = sessionStorage.getItem("uploadedPdfDataUrl");
         
         const cachedJd = sessionStorage.getItem("jobDescription") || "";
         const cachedJobTitle = sessionStorage.getItem("jobTitle") || "";
@@ -242,6 +275,13 @@ export default function ResumeEditorPage() {
         setJobTitle(cachedJobTitle);
         setCompany(cachedCompany);
         setLocation(cachedLocation);
+
+        if (cachedPdfUrl) {
+          setUploadedPdfUrl(cachedPdfUrl);
+        }
+        if (cachedText) {
+          setUploadedRawText(cachedText);
+        }
 
         if (cachedAiResult) {
           try {
@@ -320,7 +360,47 @@ export default function ResumeEditorPage() {
     }
   };
 
-  // Direct Vector PDF Download
+  // Section Reordering Helpers
+  const moveSection = (index: number, direction: "up" | "down") => {
+    const newOrder = [...sectionOrder];
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newOrder.length) return;
+    const temp = newOrder[index];
+    newOrder[index] = newOrder[targetIndex];
+    newOrder[targetIndex] = temp;
+    setSectionOrder(newOrder);
+  };
+
+  const removeSection = (sec: SectionKey) => {
+    setSectionOrder(prev => prev.filter(s => s !== sec));
+  };
+
+  // Add Custom Section
+  const handleAddCustomSection = () => {
+    const title = prompt("Enter section title (e.g. Certifications, Leadership, Awards):", "Additional Accomplishments");
+    if (!title) return;
+    setResumeData(prev => ({
+      ...prev,
+      customSections: [
+        ...(prev.customSections || []),
+        {
+          title,
+          content: "",
+          bullets: ["Spearheaded impactful initiative resulting in measurable growth."]
+        }
+      ]
+    }));
+    if (!sectionOrder.includes("custom")) {
+      setSectionOrder(prev => [...prev, "custom"]);
+    }
+  };
+
+  // 100% WYSIWYG Browser Vector Print (Zero React-PDF overlap bugs, 100% pixel-perfect)
+  const handlePrintPdf = () => {
+    window.print();
+  };
+
+  // Direct Vector PDF Download via React-PDF
   const handleDownloadPdf = async () => {
     setIsPdfGenerating(true);
     try {
@@ -330,15 +410,70 @@ export default function ResumeEditorPage() {
       const a = document.createElement("a");
       a.href = url;
       const cleanName = resumeData.personalInfo?.name?.replace(/\s+/g, "_") || "Resume";
-      a.download = `${cleanName}_Executive_ATS.pdf`;
+      a.download = `${cleanName}_Executive.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("PDF generation failed:", err);
+      // Fallback to native print if React-PDF fails
+      window.print();
     } finally {
       setIsPdfGenerating(false);
+    }
+  };
+
+  // Direct File Replacement / Upload inside Editor
+  const handleDirectFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Cache Data URL for PDF viewer
+    if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const res = ev.target?.result as string;
+        if (res) {
+          setUploadedPdfUrl(res);
+          sessionStorage.setItem("uploadedPdfDataUrl", res);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    try {
+      setIsLoadingInitial(true);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const parseRes = await fetch("/api/parse", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!parseRes.ok) throw new Error("Failed to parse file");
+      const { text } = await parseRes.json();
+      setUploadedRawText(text);
+      sessionStorage.setItem("resumeText", text);
+
+      // Structure with AI
+      const structRes = await fetch("/api/build-resume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resumeText: text }),
+      });
+
+      if (structRes.ok) {
+        const structured = await structRes.json();
+        setResumeData(structured);
+        sessionStorage.setItem("resumeStructuredData", JSON.stringify(structured));
+      }
+    } catch (err) {
+      console.error("Failed to import resume:", err);
+      alert("Failed to parse file. Please try again.");
+    } finally {
+      setIsLoadingInitial(false);
     }
   };
 
@@ -400,7 +535,7 @@ export default function ResumeEditorPage() {
   // Direct AI Bullet Trigger from Canvas Hover Wand
   const handleTriggerAiForBullet = async (
     text: string,
-    section: "experience" | "projects",
+    section: "experience" | "projects" | "custom",
     entryIdx: number,
     bulletIdx: number
   ) => {
@@ -413,7 +548,9 @@ export default function ResumeEditorPage() {
 
     const entryRole = section === "experience" 
       ? resumeData.experience?.[entryIdx]?.role 
-      : resumeData.projects?.[entryIdx]?.name;
+      : section === "projects"
+      ? resumeData.projects?.[entryIdx]?.name
+      : resumeData.customSections?.[entryIdx]?.title;
 
     try {
       const res = await fetch("/api/enhance", {
@@ -508,7 +645,6 @@ export default function ResumeEditorPage() {
   // Replace active bullet with AI option
   const handleReplaceTargetBullet = (newBulletText: string) => {
     if (!activeBulletTarget) {
-      // Default: insert into top experience
       const newExp = [...(resumeData.experience || [])];
       if (newExp.length > 0) {
         newExp[0].bullets = [newBulletText, ...(newExp[0].bullets || [])];
@@ -526,11 +662,17 @@ export default function ResumeEditorPage() {
         newExp[entryIdx].bullets![bulletIdx] = newBulletText;
         setResumeData(prev => ({ ...prev, experience: newExp }));
       }
-    } else {
+    } else if (section === "projects") {
       const newProj = [...(resumeData.projects || [])];
       if (newProj[entryIdx]?.bullets) {
         newProj[entryIdx].bullets![bulletIdx] = newBulletText;
         setResumeData(prev => ({ ...prev, projects: newProj }));
+      }
+    } else {
+      const newCustom = [...(resumeData.customSections || [])];
+      if (newCustom[entryIdx]?.bullets) {
+        newCustom[entryIdx].bullets![bulletIdx] = newBulletText;
+        setResumeData(prev => ({ ...prev, customSections: newCustom }));
       }
     }
 
@@ -555,11 +697,17 @@ export default function ResumeEditorPage() {
           newExp[entryIdx].bullets!.splice(bulletIdx + 1, 0, newBulletText);
           setResumeData(prev => ({ ...prev, experience: newExp }));
         }
-      } else {
+      } else if (section === "projects") {
         const newProj = [...(resumeData.projects || [])];
         if (newProj[entryIdx]?.bullets) {
           newProj[entryIdx].bullets!.splice(bulletIdx + 1, 0, newBulletText);
           setResumeData(prev => ({ ...prev, projects: newProj }));
+        }
+      } else {
+        const newCustom = [...(resumeData.customSections || [])];
+        if (newCustom[entryIdx]?.bullets) {
+          newCustom[entryIdx].bullets!.splice(bulletIdx + 1, 0, newBulletText);
+          setResumeData(prev => ({ ...prev, customSections: newCustom }));
         }
       }
     }
@@ -569,30 +717,39 @@ export default function ResumeEditorPage() {
     handleSaveDraft();
   };
 
-  // Estimate page fit density
-  const totalExperienceBullets = (resumeData.experience || []).reduce((acc, e) => acc + (e.bullets?.length || 0), 0);
-  const totalProjectBullets = (resumeData.projects || []).reduce((acc, p) => acc + (p.bullets?.length || 0), 0);
-  const isOnePageFit = (totalExperienceBullets + totalProjectBullets) <= 12;
+  // Selected Font Family CSS
+  const getFontFamilyStyle = () => {
+    if (fontFamily === "sans") return "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    if (fontFamily === "georgia") return "Georgia, Cambria, 'Times New Roman', serif";
+    return "'Times New Roman', Times, Baskerville, serif";
+  };
+
+  // Selected Spacing Class
+  const getSectionMarginClass = () => {
+    if (spacingMode === "compact") return "mb-2.5";
+    if (spacingMode === "relaxed") return "mb-5";
+    return "mb-3.5";
+  };
 
   if (isLoadingInitial) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
         <p className="text-sm font-medium text-muted-foreground animate-pulse">
-          Formatting into standard ATS resume template...
+          Opening Canva Document Studio...
         </p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col -m-4 md:-m-6 bg-neutral-100 dark:bg-neutral-950 font-sans">
+    <div className="min-h-screen flex flex-col -m-4 md:-m-6 bg-neutral-100 dark:bg-neutral-950 font-sans print:m-0 print:p-0 print:bg-white">
       
-      {/* ── Top Sticky Toolbar ── */}
-      <header className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-3 px-4 md:px-6 py-2.5 bg-background/95 backdrop-blur-md border-b border-border shadow-xs">
+      {/* ── Top Canva Workspace Header ── */}
+      <header className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-2.5 px-4 md:px-6 py-2 bg-background/95 backdrop-blur-md border-b border-border shadow-xs print:hidden">
         
-        {/* Left: Breadcrumbs & Page Length Gauge */}
-        <div className="flex items-center gap-3">
+        {/* Left: Breadcrumbs & Split View Toggle */}
+        <div className="flex items-center gap-2.5">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Link href="/dashboard" className="hover:text-foreground transition-colors">
               Dashboard
@@ -602,38 +759,53 @@ export default function ResumeEditorPage() {
               Analysis
             </Link>
             <ChevronRight className="w-3 h-3" />
-            <span className="font-bold text-foreground">ATS Resume Studio</span>
+            <span className="font-bold text-foreground">Canva Studio</span>
           </div>
 
-          {/* 1-Page ATS Safe Indicator */}
-          <span className={`hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-            isOnePageFit
-              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-              : "bg-amber-500/10 text-amber-600 border-amber-500/20"
-          }`}>
-            <Gauge className="w-3 h-3" />
-            {isOnePageFit ? "1-Page Standard Fit" : "Approaching 2 Pages"}
-          </span>
+          {/* Split View Toggle: Original Resume vs Editor */}
+          <button
+            onClick={() => setShowSplitView(!showSplitView)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+              showSplitView
+                ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                : "bg-card hover:bg-muted text-muted-foreground hover:text-foreground border-border"
+            }`}
+            title="Compare live editor side-by-side with your original uploaded resume"
+          >
+            <Columns2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Split View (Original)</span>
+          </button>
         </div>
 
-        {/* Center: Template & Zoom Selector */}
+        {/* Center: Canva Visual Styling Controls */}
         <div className="flex items-center gap-2">
           
-          {/* Template Format Selector */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-[11px] text-muted-foreground font-semibold hidden md:inline">Template:</span>
+          {/* Font Selector */}
+          <div className="flex items-center gap-1 text-xs">
             <select
-              value={selectedTemplate.id}
-              onChange={(e) => {
-                const found = TEMPLATES.find(t => t.id === e.target.value);
-                if (found) setSelectedTemplate(found);
-              }}
+              value={fontFamily}
+              onChange={(e) => setFontFamily(e.target.value as any)}
               className="px-2.5 py-1 rounded-lg bg-card border border-border text-xs font-semibold text-foreground focus:outline-none cursor-pointer"
             >
-              {TEMPLATES.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
+              <option value="times">Times Roman (LaTeX/Classic)</option>
+              <option value="sans">Modern Sans (Canva Clean)</option>
+              <option value="georgia">Georgia (Executive Elegant)</option>
             </select>
+          </div>
+
+          {/* Theme Color Selector */}
+          <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-1">
+            {COLOR_THEMES.map((theme) => (
+              <button
+                key={theme.id}
+                onClick={() => setColorTheme(theme)}
+                style={{ backgroundColor: theme.line }}
+                className={`w-4 h-4 rounded-full transition-transform cursor-pointer ${
+                  colorTheme.id === theme.id ? "scale-125 ring-2 ring-primary ring-offset-1" : "opacity-75 hover:opacity-100"
+                }`}
+                title={theme.name}
+              />
+            ))}
           </div>
 
           {/* Zoom controls */}
@@ -659,6 +831,18 @@ export default function ResumeEditorPage() {
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
           
+          {/* Import / Replace Resume Button */}
+          <label className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-border bg-card text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer">
+            <UploadCloud className="w-3.5 h-3.5 text-primary" />
+            <span className="hidden md:inline">Import Resume</span>
+            <input
+              type="file"
+              accept=".pdf,.docx"
+              onChange={handleDirectFileUpload}
+              className="hidden"
+            />
+          </label>
+
           {/* Target JD Matcher Toggle */}
           <button
             onClick={() => {
@@ -672,7 +856,7 @@ export default function ResumeEditorPage() {
             }`}
           >
             <Target className="w-3.5 h-3.5 text-primary" />
-            <span className="hidden sm:inline">Target JD Radar</span>
+            <span className="hidden sm:inline">Target JD</span>
             {missingKeywords.length > 0 && (
               <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">
                 {missingKeywords.length}
@@ -693,7 +877,7 @@ export default function ResumeEditorPage() {
             }`}
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>AI Bullet Studio</span>
+            <span>AI Bullets</span>
             {aiSuggestions.length > 0 && (
               <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-primary/20 text-primary border border-primary/30">
                 {aiSuggestions.length - appliedSuggestionIds.size}
@@ -719,46 +903,80 @@ export default function ResumeEditorPage() {
             )}
           </button>
 
-          {/* Direct Vector PDF Export */}
+          {/* 100% WYSIWYG Vector PDF Export (Print to PDF - 0% Overlap) */}
           <button
-            onClick={handleDownloadPdf}
-            disabled={isPdfGenerating}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-foreground text-background text-xs font-bold hover:opacity-90 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+            onClick={handlePrintPdf}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-foreground text-background text-xs font-bold hover:opacity-90 transition-all shadow-xs cursor-pointer"
+            title="Download pixel-perfect PDF directly from browser (100% WYSIWYG)"
           >
-            {isPdfGenerating ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Compiling...</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-3.5 h-3.5" />
-                <span>Download PDF</span>
-              </>
-            )}
+            <Printer className="w-3.5 h-3.5" />
+            <span>Print / Save PDF</span>
           </button>
         </div>
       </header>
 
-      {/* ── Main Workspace Body (Horizontal + Vertical Pan Support) ── */}
+      {/* ── Main Workspace Body (With optional Split View) ── */}
       <div className="flex-1 flex relative overflow-hidden">
         
-        {/* Canvas Scrollable Wrapper */}
-        <div className="flex-1 overflow-x-auto overflow-y-auto p-4 md:p-8 flex justify-start xl:justify-center">
+        {/* ── Optional Left Pane: Original Uploaded Resume Preview ── */}
+        {showSplitView && (
+          <div className="w-1/2 border-r border-border bg-neutral-200 dark:bg-neutral-900 p-4 flex flex-col shrink-0 overflow-hidden">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-border">
+              <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+                <FileText className="w-4 h-4 text-primary" />
+                <span>Original Uploaded Resume</span>
+              </div>
+              <button
+                onClick={() => setShowSplitView(false)}
+                className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                Close Split View
+              </button>
+            </div>
+
+            <div className="flex-1 bg-white dark:bg-neutral-950 rounded-xl border border-border overflow-auto shadow-inner p-4">
+              {uploadedPdfUrl ? (
+                <iframe
+                  src={uploadedPdfUrl}
+                  title="Original PDF"
+                  className="w-full h-full min-h-[700px] rounded-lg border-0"
+                />
+              ) : uploadedRawText ? (
+                <pre className="text-xs text-neutral-800 dark:text-neutral-200 whitespace-pre-wrap font-mono leading-relaxed">
+                  {uploadedRawText}
+                </pre>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center p-6 text-muted-foreground text-xs space-y-2">
+                  <UploadCloud className="w-8 h-8 text-muted-foreground/60" />
+                  <p className="font-semibold">No original document preview found in session cache.</p>
+                  <p className="text-[11px]">Click &ldquo;Import Resume&rdquo; above to drop your PDF and view it side-by-side.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Main Canvas Scrollable Wrapper ── */}
+        <div className={`flex-1 overflow-x-auto overflow-y-auto p-4 md:p-8 flex justify-start xl:justify-center ${
+          showSplitView ? "w-1/2" : "w-full"
+        }`}>
           
           <div 
             style={{ 
               transform: `scale(${zoomScale / 100})`, 
               transformOrigin: "top center",
-              fontFamily: selectedTemplate.id === "modern" ? "ui-sans-serif, system-ui, sans-serif" : '"Times New Roman", Times, serif'
+              fontFamily: getFontFamilyStyle()
             }}
             className="transition-transform duration-200 shrink-0"
           >
-            {/* ── STRICT ATS PRINTED RESUME SHEET (Jake's / Harvard Standard: 816px x 1056px) ── */}
-            <div className="w-[816px] min-h-[1056px] bg-white text-neutral-900 shadow-2xl p-[36px] md:p-[42px] leading-[1.28] text-[9.5pt] select-text relative border border-neutral-200">
+            {/* ── CANVA EDITABLE RESUME SHEET (US Letter Standard: 816px x 1056px) ── */}
+            <div 
+              id="resume-canvas-sheet"
+              className="w-[816px] min-h-[1056px] bg-white text-neutral-900 shadow-2xl p-[36px] md:p-[42px] leading-[1.3] text-[9.5pt] select-text relative border border-neutral-200 print:border-none print:shadow-none print:m-0 print:p-8"
+            >
               
-              {/* ── 1. HEADER (Centered, Authentic Overleaf Layout) ── */}
-              <div className="text-center mb-2.5">
+              {/* ── 1. HEADER (Canva Editable Name & Contact Bar) ── */}
+              <div className="text-center mb-4 pb-2 border-b border-neutral-100">
                 <input
                   type="text"
                   value={resumeData.personalInfo?.name || ""}
@@ -767,11 +985,11 @@ export default function ResumeEditorPage() {
                     personalInfo: { ...prev.personalInfo, name: e.target.value }
                   }))}
                   placeholder="FIRST LAST"
-                  className="w-full text-center text-[21pt] font-bold tracking-normal text-neutral-900 uppercase hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 transition-colors leading-none mb-1.5"
+                  className="w-full text-center text-[22pt] font-bold tracking-normal text-neutral-900 uppercase hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-2 transition-colors leading-tight mb-2"
                 />
 
-                {/* Single-line Dynamic Contact Bar (Auto-fit widths, no orphan wrapping) */}
-                <div className="flex flex-wrap items-center justify-center gap-x-1.5 text-[8.5pt] text-neutral-800 font-normal">
+                {/* Single-line Dynamic Contact Bar */}
+                <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[8.5pt] text-neutral-800 font-normal">
                   <AutoWidthInput
                     value={resumeData.personalInfo?.phone || ""}
                     onChange={(val) => setResumeData(prev => ({
@@ -822,481 +1040,748 @@ export default function ResumeEditorPage() {
                 </div>
               </div>
 
-              {/* ── 2. EDUCATION SECTION (Jake's LaTeX Position #1) ── */}
-              <div className="mb-3">
-                <div className="flex items-center justify-between pb-0.5 mb-1.5 border-b-[0.75pt] border-neutral-900">
-                  <h2 className="text-[10pt] font-bold uppercase tracking-wider text-neutral-900">
-                    Education
-                  </h2>
-                  <button
-                    onClick={() => {
-                      setResumeData(prev => ({
-                        ...prev,
-                        education: [
-                          ...(prev.education || []),
-                          {
-                            institution: "University Name",
-                            degree: "B.S. in Computer Science; GPA: 3.8",
-                            date: "Aug 2018 – May 2022",
-                            location: "City, State",
-                            bullets: []
-                          }
-                        ]
-                      }));
-                    }}
-                    className="text-[9px] font-bold text-neutral-500 hover:text-neutral-900 flex items-center gap-0.5 cursor-pointer opacity-70 hover:opacity-100"
-                  >
-                    <Plus className="w-2.5 h-2.5" />
-                    <span>Add School</span>
-                  </button>
-                </div>
-
-                <div className="space-y-1.5">
-                  {(resumeData.education || []).map((edu, eduIdx) => (
-                    <div key={eduIdx} className="group/edu relative">
-                      {/* Row 1: School (Bold) \hfill Location (Bold) */}
-                      <div className="flex justify-between items-baseline font-bold text-[9.5pt]">
-                        <input
-                          type="text"
-                          value={edu.institution || ""}
-                          onChange={(e) => {
-                            const newEdu = [...(resumeData.education || [])];
-                            newEdu[eduIdx].institution = e.target.value;
-                            setResumeData(prev => ({ ...prev, education: newEdu }));
-                          }}
-                          placeholder="Institution Name"
-                          className="font-bold text-[9.5pt] text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
-                        />
-                        <div className="flex items-center gap-1 shrink-0 ml-2">
-                          <input
-                            type="text"
-                            value={edu.location || ""}
-                            onChange={(e) => {
-                              const newEdu = [...(resumeData.education || [])];
-                              newEdu[eduIdx].location = e.target.value;
-                              setResumeData(prev => ({ ...prev, education: newEdu }));
-                            }}
-                            placeholder="City, State"
-                            className="font-bold text-[9pt] text-right text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-28 shrink-0"
-                          />
+              {/* ── DYNAMIC SECTIONS IN USER-CONFIGURABLE ORDER ── */}
+              {sectionOrder.map((sectionKey, sIdx) => {
+                
+                // ── SUMMARY SECTION ──
+                if (sectionKey === "summary") {
+                  if (resumeData.summary === undefined && !sectionOrder.includes("summary")) return null;
+                  return (
+                    <div key="summary" className={`${getSectionMarginClass()} group/sec relative`}>
+                      <div className={`flex items-center justify-between pb-0.5 mb-1.5 border-b-[0.75pt] ${colorTheme.border}`}>
+                        <h2 className={`text-[10pt] font-bold uppercase tracking-wider ${colorTheme.text}`}>
+                          Professional Summary
+                        </h2>
+                        
+                        {/* Section Move / Delete Actions */}
+                        <div className="opacity-0 group-hover/sec:opacity-100 transition-opacity flex items-center gap-1 print:hidden">
                           <button
-                            onClick={() => {
-                              const newEdu = (resumeData.education || []).filter((_, i) => i !== eduIdx);
-                              setResumeData(prev => ({ ...prev, education: newEdu }));
-                            }}
-                            className="opacity-0 group-hover/edu:opacity-100 text-neutral-400 hover:text-rose-500 cursor-pointer p-0.5"
-                            title="Delete school"
+                            onClick={() => moveSection(sIdx, "up")}
+                            disabled={sIdx === 0}
+                            className="p-0.5 text-neutral-400 hover:text-neutral-800 disabled:opacity-30 cursor-pointer"
+                            title="Move section up"
+                          >
+                            <ChevronUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => moveSection(sIdx, "down")}
+                            disabled={sIdx === sectionOrder.length - 1}
+                            className="p-0.5 text-neutral-400 hover:text-neutral-800 disabled:opacity-30 cursor-pointer"
+                            title="Move section down"
+                          >
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => removeSection("summary")}
+                            className="p-0.5 text-neutral-400 hover:text-rose-500 cursor-pointer"
+                            title="Remove section"
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
                       </div>
 
-                      {/* Row 2: Degree & GPA (Italic) \hfill Dates (Italic) */}
-                      <div className="flex justify-between items-baseline text-[9pt] text-neutral-800 italic">
-                        <input
-                          type="text"
-                          value={edu.degree || ""}
-                          onChange={(e) => {
-                            const newEdu = [...(resumeData.education || [])];
-                            newEdu[eduIdx].degree = e.target.value;
-                            setResumeData(prev => ({ ...prev, education: newEdu }));
-                          }}
-                          placeholder="Degree and Major; GPA"
-                          className="italic text-[9pt] text-neutral-800 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
-                        />
-                        <input
-                          type="text"
-                          value={edu.date || ""}
-                          onChange={(e) => {
-                            const newEdu = [...(resumeData.education || [])];
-                            newEdu[eduIdx].date = e.target.value;
-                            setResumeData(prev => ({ ...prev, education: newEdu }));
-                          }}
-                          placeholder="Dates"
-                          className="italic text-[9pt] text-right text-neutral-700 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-32 shrink-0 ml-2"
-                        />
-                      </div>
+                      <AutoResizeTextarea
+                        value={resumeData.summary || ""}
+                        onChange={(val) => setResumeData(prev => ({ ...prev, summary: val }))}
+                        placeholder="Write a compelling executive summary or core profile..."
+                        className="w-full bg-transparent hover:bg-neutral-50/80 focus:bg-blue-50/50 focus:outline-none rounded px-1 resize-none overflow-hidden text-neutral-800 leading-[1.3] text-[9pt]"
+                      />
                     </div>
-                  ))}
-                </div>
-              </div>
+                  );
+                }
 
-              {/* ── 3. EXPERIENCE SECTION ── */}
-              <div className="mb-3">
-                <div className="flex items-center justify-between pb-0.5 mb-1.5 border-b-[0.75pt] border-neutral-900">
-                  <h2 className="text-[10pt] font-bold uppercase tracking-wider text-neutral-900">
-                    Experience
-                  </h2>
-                  <button
-                    onClick={() => {
-                      setResumeData(prev => ({
-                        ...prev,
-                        experience: [
-                          ...(prev.experience || []),
-                          {
-                            company: "Company Name",
-                            role: "Title / Role",
-                            date: "Month Year – Present",
-                            location: "City, State",
-                            bullets: [
-                              "Spearheaded distributed cloud infrastructure optimization, improving throughput by 35%."
-                            ]
-                          }
-                        ]
-                      }));
-                    }}
-                    className="text-[9px] font-bold text-neutral-500 hover:text-neutral-900 flex items-center gap-0.5 cursor-pointer opacity-70 hover:opacity-100"
-                  >
-                    <Plus className="w-2.5 h-2.5" />
-                    <span>Add Role</span>
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  {(resumeData.experience || []).map((exp, expIdx) => (
-                    <div key={expIdx} className="group/exp relative">
-                      
-                      {/* Row 1: Company (Bold) \hfill Location (Bold) */}
-                      <div className="flex justify-between items-baseline font-bold text-[9.5pt]">
-                        <input
-                          type="text"
-                          value={exp.company || ""}
-                          onChange={(e) => {
-                            const newExp = [...(resumeData.experience || [])];
-                            newExp[expIdx].company = e.target.value;
-                            setResumeData(prev => ({ ...prev, experience: newExp }));
-                          }}
-                          placeholder="Company Name"
-                          className="font-bold text-[9.5pt] text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
-                        />
-                        <div className="flex items-center gap-1 shrink-0 ml-2">
-                          <input
-                            type="text"
-                            value={exp.location || ""}
-                            onChange={(e) => {
-                              const newExp = [...(resumeData.experience || [])];
-                              newExp[expIdx].location = e.target.value;
-                              setResumeData(prev => ({ ...prev, experience: newExp }));
-                            }}
-                            placeholder="City, State"
-                            className="font-bold text-[9pt] text-right text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-32 shrink-0"
-                          />
+                // ── EDUCATION SECTION ──
+                if (sectionKey === "education") {
+                  return (
+                    <div key="education" className={`${getSectionMarginClass()} group/sec relative`}>
+                      <div className={`flex items-center justify-between pb-0.5 mb-1.5 border-b-[0.75pt] ${colorTheme.border}`}>
+                        <h2 className={`text-[10pt] font-bold uppercase tracking-wider ${colorTheme.text}`}>
+                          Education
+                        </h2>
+                        
+                        {/* Section Actions */}
+                        <div className="flex items-center gap-2">
                           <button
                             onClick={() => {
-                              const newExp = (resumeData.experience || []).filter((_, i) => i !== expIdx);
-                              setResumeData(prev => ({ ...prev, experience: newExp }));
+                              setResumeData(prev => ({
+                                ...prev,
+                                education: [
+                                  ...(prev.education || []),
+                                  {
+                                    institution: "University Name",
+                                    degree: "B.S. in Computer Science; GPA: 3.8",
+                                    date: "Aug 2018 – May 2022",
+                                    location: "City, State",
+                                    bullets: []
+                                  }
+                                ]
+                              }));
                             }}
-                            className="opacity-0 group-hover/exp:opacity-100 text-neutral-400 hover:text-rose-500 cursor-pointer p-0.5"
-                            title="Delete position"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Row 2: Role (Italic) \hfill Dates (Italic) */}
-                      <div className="flex justify-between items-baseline text-[9pt] text-neutral-800 italic mb-0.5">
-                        <input
-                          type="text"
-                          value={exp.role || ""}
-                          onChange={(e) => {
-                            const newExp = [...(resumeData.experience || [])];
-                            newExp[expIdx].role = e.target.value;
-                            setResumeData(prev => ({ ...prev, experience: newExp }));
-                          }}
-                          placeholder="Role / Title"
-                          className="italic text-[9pt] text-neutral-800 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
-                        />
-                        <input
-                          type="text"
-                          value={exp.date || ""}
-                          onChange={(e) => {
-                            const newExp = [...(resumeData.experience || [])];
-                            newExp[expIdx].date = e.target.value;
-                            setResumeData(prev => ({ ...prev, experience: newExp }));
-                          }}
-                          placeholder="Dates"
-                          className="italic text-[9pt] text-right text-neutral-700 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-32 shrink-0 ml-2"
-                        />
-                      </div>
-
-                      {/* Bullets (Clean LaTeX Itemize Indent) */}
-                      <ul className="list-none space-y-1 mt-1 pl-3">
-                        {(exp.bullets || []).map((bullet, bulletIdx) => {
-                          const isHighlighted = flashHighlight === bullet;
-                          return (
-                            <li 
-                              key={bulletIdx}
-                              className={`flex items-start gap-1.5 group/bullet text-[9pt] leading-[1.28] text-neutral-800 transition-colors ${
-                                isHighlighted ? "bg-emerald-100 ring-2 ring-emerald-400 rounded" : ""
-                              }`}
-                            >
-                              <span className="select-none font-bold text-neutral-900 mt-0.5 shrink-0">•</span>
-                              <AutoResizeTextarea
-                                value={bullet}
-                                onChange={(val) => {
-                                  const newExp = [...(resumeData.experience || [])];
-                                  newExp[expIdx].bullets![bulletIdx] = val;
-                                  setResumeData(prev => ({ ...prev, experience: newExp }));
-                                }}
-                                placeholder="Accomplished [X] as measured by [Y] by doing [Z]..."
-                                className="w-full bg-transparent hover:bg-neutral-50/80 focus:bg-blue-50/50 focus:outline-none rounded px-1 resize-none overflow-hidden text-neutral-800 leading-[1.28] min-w-0"
-                              />
-
-                              {/* Ghost Actions on Hover (AI Polish & Delete) */}
-                              <div className="opacity-0 group-hover/bullet:opacity-100 transition-opacity flex items-center gap-1 shrink-0 ml-1">
-                                <button
-                                  onClick={() => handleTriggerAiForBullet(bullet, "experience", expIdx, bulletIdx)}
-                                  className="p-1 rounded text-emerald-600 hover:bg-emerald-50 cursor-pointer flex items-center gap-1 text-[10px] font-semibold bg-emerald-50/50 border border-emerald-500/20"
-                                  title="AI Polish full bullet point"
-                                >
-                                  <Wand2 className="w-3 h-3" />
-                                  <span className="hidden sm:inline">AI Polish</span>
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    const newExp = [...(resumeData.experience || [])];
-                                    newExp[expIdx].bullets = newExp[expIdx].bullets!.filter((_, i) => i !== bulletIdx);
-                                    setResumeData(prev => ({ ...prev, experience: newExp }));
-                                  }}
-                                  className="p-1 rounded text-neutral-400 hover:text-rose-500 cursor-pointer"
-                                  title="Delete bullet"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </li>
-                          );
-                        })}
-
-                        {/* Add bullet link */}
-                        <li className="pt-0.5">
-                          <button
-                            onClick={() => {
-                              const newExp = [...(resumeData.experience || [])];
-                              newExp[expIdx].bullets = [...(newExp[expIdx].bullets || []), "Spearheaded key engineering initiatives that accelerated delivery by 30%."];
-                              setResumeData(prev => ({ ...prev, experience: newExp }));
-                            }}
-                            className="text-[8.5pt] font-semibold text-neutral-400 hover:text-neutral-800 flex items-center gap-1 cursor-pointer pl-3"
+                            className="text-[9px] font-bold text-neutral-500 hover:text-neutral-900 flex items-center gap-0.5 cursor-pointer opacity-70 hover:opacity-100 print:hidden"
                           >
                             <Plus className="w-2.5 h-2.5" />
-                            <span>Add bullet</span>
+                            <span>Add School</span>
                           </button>
-                        </li>
-                      </ul>
 
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* ── 4. PROJECTS SECTION ── */}
-              {(resumeData.projects && resumeData.projects.length > 0) && (
-                <div className="mb-3">
-                  <div className="flex items-center justify-between pb-0.5 mb-1.5 border-b-[0.75pt] border-neutral-900">
-                    <h2 className="text-[10pt] font-bold uppercase tracking-wider text-neutral-900">
-                      Projects
-                    </h2>
-                    <button
-                      onClick={() => {
-                        setResumeData(prev => ({
-                          ...prev,
-                          projects: [
-                            ...(prev.projects || []),
-                            {
-                              name: "Project Name",
-                              description: "Go, Kafka, Redis, Docker",
-                              date: "2023",
-                              bullets: ["Engineered distributed pipeline capable of handling 50k events/sec."]
-                            }
-                          ]
-                        }));
-                      }}
-                      className="text-[9px] font-bold text-neutral-500 hover:text-neutral-900 flex items-center gap-0.5 cursor-pointer opacity-70 hover:opacity-100"
-                    >
-                      <Plus className="w-2.5 h-2.5" />
-                      <span>Add Project</span>
-                    </button>
-                  </div>
-
-                  <div className="space-y-2">
-                    {resumeData.projects.map((proj, pIdx) => (
-                      <div key={pIdx} className="group/proj relative">
-                        {/* Line 1: Project Name \hfill Date */}
-                        <div className="flex justify-between items-baseline font-bold text-[9.5pt]">
-                          <input
-                            type="text"
-                            value={proj.name || ""}
-                            onChange={(e) => {
-                              const newProj = [...(resumeData.projects || [])];
-                              newProj[pIdx].name = e.target.value;
-                              setResumeData(prev => ({ ...prev, projects: newProj }));
-                            }}
-                            placeholder="Project Name"
-                            className="font-bold text-[9.5pt] text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
-                          />
-                          <div className="flex items-center gap-1 shrink-0 ml-2">
-                            <input
-                              type="text"
-                              value={proj.date || ""}
-                              onChange={(e) => {
-                                const newProj = [...(resumeData.projects || [])];
-                                newProj[pIdx].date = e.target.value;
-                                setResumeData(prev => ({ ...prev, projects: newProj }));
-                              }}
-                              placeholder="Date"
-                              className="font-bold text-[9pt] text-right text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-24 shrink-0"
-                            />
+                          <div className="opacity-0 group-hover/sec:opacity-100 transition-opacity flex items-center gap-1 print:hidden">
                             <button
-                              onClick={() => {
-                                const newProj = (resumeData.projects || []).filter((_, i) => i !== pIdx);
-                                setResumeData(prev => ({ ...prev, projects: newProj }));
-                              }}
-                              className="opacity-0 group-hover/proj:opacity-100 text-neutral-400 hover:text-rose-500 cursor-pointer p-0.5"
-                              title="Delete project"
+                              onClick={() => moveSection(sIdx, "up")}
+                              disabled={sIdx === 0}
+                              className="p-0.5 text-neutral-400 hover:text-neutral-800 disabled:opacity-30 cursor-pointer"
+                            >
+                              <ChevronUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => moveSection(sIdx, "down")}
+                              disabled={sIdx === sectionOrder.length - 1}
+                              className="p-0.5 text-neutral-400 hover:text-neutral-800 disabled:opacity-30 cursor-pointer"
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => removeSection("education")}
+                              className="p-0.5 text-neutral-400 hover:text-rose-500 cursor-pointer"
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
                           </div>
                         </div>
+                      </div>
 
-                        {/* Line 2: Technologies / Subtitle (Italic) */}
-                        <div className="flex justify-between items-baseline text-[9pt] text-neutral-800 italic mb-0.5">
-                          <input
-                            type="text"
-                            value={proj.description || ""}
-                            onChange={(e) => {
-                              const newProj = [...(resumeData.projects || [])];
-                              newProj[pIdx].description = e.target.value;
-                              setResumeData(prev => ({ ...prev, projects: newProj }));
+                      <div className="space-y-2">
+                        {(resumeData.education || []).map((edu, eduIdx) => (
+                          <div key={eduIdx} className="group/edu relative">
+                            {/* Row 1: School (Bold) \hfill Location (Bold) */}
+                            <div className="flex justify-between items-baseline font-bold text-[9.5pt]">
+                              <input
+                                type="text"
+                                value={edu.institution || ""}
+                                onChange={(e) => {
+                                  const newEdu = [...(resumeData.education || [])];
+                                  newEdu[eduIdx].institution = e.target.value;
+                                  setResumeData(prev => ({ ...prev, education: newEdu }));
+                                }}
+                                placeholder="Institution Name"
+                                className="font-bold text-[9.5pt] text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
+                              />
+                              <div className="flex items-center gap-1 shrink-0 ml-2">
+                                <input
+                                  type="text"
+                                  value={edu.location || ""}
+                                  onChange={(e) => {
+                                    const newEdu = [...(resumeData.education || [])];
+                                    newEdu[eduIdx].location = e.target.value;
+                                    setResumeData(prev => ({ ...prev, education: newEdu }));
+                                  }}
+                                  placeholder="City, State"
+                                  className="font-bold text-[9pt] text-right text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-28 shrink-0"
+                                />
+                                <button
+                                  onClick={() => {
+                                    const newEdu = (resumeData.education || []).filter((_, i) => i !== eduIdx);
+                                    setResumeData(prev => ({ ...prev, education: newEdu }));
+                                  }}
+                                  className="opacity-0 group-hover/edu:opacity-100 text-neutral-400 hover:text-rose-500 cursor-pointer p-0.5 print:hidden"
+                                  title="Delete school"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Row 2: Degree & GPA (Italic) \hfill Dates (Italic) */}
+                            <div className="flex justify-between items-baseline text-[9pt] text-neutral-800 italic">
+                              <input
+                                type="text"
+                                value={edu.degree || ""}
+                                onChange={(e) => {
+                                  const newEdu = [...(resumeData.education || [])];
+                                  newEdu[eduIdx].degree = e.target.value;
+                                  setResumeData(prev => ({ ...prev, education: newEdu }));
+                                }}
+                                placeholder="Degree and Major; GPA"
+                                className="italic text-[9pt] text-neutral-800 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
+                              />
+                              <input
+                                type="text"
+                                value={edu.date || ""}
+                                onChange={(e) => {
+                                  const newEdu = [...(resumeData.education || [])];
+                                  newEdu[eduIdx].date = e.target.value;
+                                  setResumeData(prev => ({ ...prev, education: newEdu }));
+                                }}
+                                placeholder="Dates"
+                                className="italic text-[9pt] text-right text-neutral-700 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-32 shrink-0 ml-2"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // ── EXPERIENCE SECTION ──
+                if (sectionKey === "experience") {
+                  return (
+                    <div key="experience" className={`${getSectionMarginClass()} group/sec relative`}>
+                      <div className={`flex items-center justify-between pb-0.5 mb-1.5 border-b-[0.75pt] ${colorTheme.border}`}>
+                        <h2 className={`text-[10pt] font-bold uppercase tracking-wider ${colorTheme.text}`}>
+                          Experience
+                        </h2>
+                        
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setResumeData(prev => ({
+                                ...prev,
+                                experience: [
+                                  ...(prev.experience || []),
+                                  {
+                                    company: "Company Name",
+                                    role: "Title / Role",
+                                    date: "Month Year – Present",
+                                    location: "City, State",
+                                    bullets: [
+                                      "Spearheaded distributed cloud infrastructure optimization, improving throughput by 35%."
+                                    ]
+                                  }
+                                ]
+                              }));
                             }}
-                            placeholder="Technologies (e.g. Next.js, TypeScript, PostgreSQL)"
-                            className="italic text-[9pt] text-neutral-800 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
-                          />
-                        </div>
+                            className="text-[9px] font-bold text-neutral-500 hover:text-neutral-900 flex items-center gap-0.5 cursor-pointer opacity-70 hover:opacity-100 print:hidden"
+                          >
+                            <Plus className="w-2.5 h-2.5" />
+                            <span>Add Role</span>
+                          </button>
 
-                        {/* Project Bullets */}
-                        <ul className="list-none space-y-1 mt-0.5 pl-3">
-                          {(proj.bullets || []).map((b, bIdx) => (
-                            <li key={bIdx} className="flex items-start gap-1.5 group/pbullet text-[9pt] leading-[1.28] text-neutral-800">
-                              <span className="select-none font-bold text-neutral-900 mt-0.5 shrink-0">•</span>
-                              <AutoResizeTextarea
-                                value={b}
-                                onChange={(val) => {
+                          <div className="opacity-0 group-hover/sec:opacity-100 transition-opacity flex items-center gap-1 print:hidden">
+                            <button
+                              onClick={() => moveSection(sIdx, "up")}
+                              disabled={sIdx === 0}
+                              className="p-0.5 text-neutral-400 hover:text-neutral-800 disabled:opacity-30 cursor-pointer"
+                            >
+                              <ChevronUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => moveSection(sIdx, "down")}
+                              disabled={sIdx === sectionOrder.length - 1}
+                              className="p-0.5 text-neutral-400 hover:text-neutral-800 disabled:opacity-30 cursor-pointer"
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => removeSection("experience")}
+                              className="p-0.5 text-neutral-400 hover:text-rose-500 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        {(resumeData.experience || []).map((exp, expIdx) => (
+                          <div key={expIdx} className="group/exp relative">
+                            {/* Row 1: Company (Bold) \hfill Location (Bold) */}
+                            <div className="flex justify-between items-baseline font-bold text-[9.5pt]">
+                              <input
+                                type="text"
+                                value={exp.company || ""}
+                                onChange={(e) => {
+                                  const newExp = [...(resumeData.experience || [])];
+                                  newExp[expIdx].company = e.target.value;
+                                  setResumeData(prev => ({ ...prev, experience: newExp }));
+                                }}
+                                placeholder="Company Name"
+                                className="font-bold text-[9.5pt] text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
+                              />
+                              <div className="flex items-center gap-1 shrink-0 ml-2">
+                                <input
+                                  type="text"
+                                  value={exp.location || ""}
+                                  onChange={(e) => {
+                                    const newExp = [...(resumeData.experience || [])];
+                                    newExp[expIdx].location = e.target.value;
+                                    setResumeData(prev => ({ ...prev, experience: newExp }));
+                                  }}
+                                  placeholder="City, State"
+                                  className="font-bold text-[9pt] text-right text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-32 shrink-0"
+                                />
+                                <button
+                                  onClick={() => {
+                                    const newExp = (resumeData.experience || []).filter((_, i) => i !== expIdx);
+                                    setResumeData(prev => ({ ...prev, experience: newExp }));
+                                  }}
+                                  className="opacity-0 group-hover/exp:opacity-100 text-neutral-400 hover:text-rose-500 cursor-pointer p-0.5 print:hidden"
+                                  title="Delete position"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Row 2: Role (Italic) \hfill Dates (Italic) */}
+                            <div className="flex justify-between items-baseline text-[9pt] text-neutral-800 italic mb-0.5">
+                              <input
+                                type="text"
+                                value={exp.role || ""}
+                                onChange={(e) => {
+                                  const newExp = [...(resumeData.experience || [])];
+                                  newExp[expIdx].role = e.target.value;
+                                  setResumeData(prev => ({ ...prev, experience: newExp }));
+                                }}
+                                placeholder="Role / Title"
+                                className="italic text-[9pt] text-neutral-800 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
+                              />
+                              <input
+                                type="text"
+                                value={exp.date || ""}
+                                onChange={(e) => {
+                                  const newExp = [...(resumeData.experience || [])];
+                                  newExp[expIdx].date = e.target.value;
+                                  setResumeData(prev => ({ ...prev, experience: newExp }));
+                                }}
+                                placeholder="Dates"
+                                className="italic text-[9pt] text-right text-neutral-700 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-32 shrink-0 ml-2"
+                              />
+                            </div>
+
+                            {/* Bullets with Hover AI Polish Wand */}
+                            <ul className="list-none space-y-1 mt-1 pl-3">
+                              {(exp.bullets || []).map((bullet, bulletIdx) => {
+                                const isHighlighted = flashHighlight === bullet;
+                                return (
+                                  <li 
+                                    key={bulletIdx}
+                                    className={`flex items-start gap-1.5 group/bullet text-[9pt] leading-[1.28] text-neutral-800 transition-colors ${
+                                      isHighlighted ? "bg-emerald-100 ring-2 ring-emerald-400 rounded" : ""
+                                    }`}
+                                  >
+                                    <span className="select-none font-bold text-neutral-900 mt-0.5 shrink-0">•</span>
+                                    <AutoResizeTextarea
+                                      value={bullet}
+                                      onChange={(val) => {
+                                        const newExp = [...(resumeData.experience || [])];
+                                        newExp[expIdx].bullets![bulletIdx] = val;
+                                        setResumeData(prev => ({ ...prev, experience: newExp }));
+                                      }}
+                                      placeholder="Accomplished [X] as measured by [Y] by doing [Z]..."
+                                      className="w-full bg-transparent hover:bg-neutral-50/80 focus:bg-blue-50/50 focus:outline-none rounded px-1 resize-none overflow-hidden text-neutral-800 leading-[1.28] min-w-0"
+                                    />
+
+                                    {/* Action Wand & Delete */}
+                                    <div className="opacity-0 group-hover/bullet:opacity-100 transition-opacity flex items-center gap-1 shrink-0 ml-1 print:hidden">
+                                      <button
+                                        onClick={() => handleTriggerAiForBullet(bullet, "experience", expIdx, bulletIdx)}
+                                        className="p-1 rounded text-emerald-600 hover:bg-emerald-50 cursor-pointer flex items-center gap-1 text-[10px] font-semibold bg-emerald-50/50 border border-emerald-500/20 shadow-2xs"
+                                        title="AI Polish full bullet with metrics"
+                                      >
+                                        <Wand2 className="w-3 h-3" />
+                                        <span className="hidden sm:inline">AI Polish</span>
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          const newExp = [...(resumeData.experience || [])];
+                                          newExp[expIdx].bullets = newExp[expIdx].bullets!.filter((_, i) => i !== bulletIdx);
+                                          setResumeData(prev => ({ ...prev, experience: newExp }));
+                                        }}
+                                        className="p-1 rounded text-neutral-400 hover:text-rose-500 cursor-pointer"
+                                        title="Delete bullet"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </li>
+                                );
+                              })}
+
+                              <li className="pt-0.5 print:hidden">
+                                <button
+                                  onClick={() => {
+                                    const newExp = [...(resumeData.experience || [])];
+                                    newExp[expIdx].bullets = [...(newExp[expIdx].bullets || []), "Spearheaded key engineering initiatives that accelerated delivery by 30%."];
+                                    setResumeData(prev => ({ ...prev, experience: newExp }));
+                                  }}
+                                  className="text-[8.5pt] font-semibold text-neutral-400 hover:text-neutral-800 flex items-center gap-1 cursor-pointer pl-3"
+                                >
+                                  <Plus className="w-2.5 h-2.5" />
+                                  <span>Add bullet</span>
+                                </button>
+                              </li>
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // ── PROJECTS SECTION ──
+                if (sectionKey === "projects") {
+                  return (
+                    <div key="projects" className={`${getSectionMarginClass()} group/sec relative`}>
+                      <div className={`flex items-center justify-between pb-0.5 mb-1.5 border-b-[0.75pt] ${colorTheme.border}`}>
+                        <h2 className={`text-[10pt] font-bold uppercase tracking-wider ${colorTheme.text}`}>
+                          Projects
+                        </h2>
+                        
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setResumeData(prev => ({
+                                ...prev,
+                                projects: [
+                                  ...(prev.projects || []),
+                                  {
+                                    name: "Project Name",
+                                    description: "Go, Kafka, Redis, Docker",
+                                    date: "2023",
+                                    bullets: ["Engineered distributed pipeline capable of handling 50k events/sec."]
+                                  }
+                                ]
+                              }));
+                            }}
+                            className="text-[9px] font-bold text-neutral-500 hover:text-neutral-900 flex items-center gap-0.5 cursor-pointer opacity-70 hover:opacity-100 print:hidden"
+                          >
+                            <Plus className="w-2.5 h-2.5" />
+                            <span>Add Project</span>
+                          </button>
+
+                          <div className="opacity-0 group-hover/sec:opacity-100 transition-opacity flex items-center gap-1 print:hidden">
+                            <button
+                              onClick={() => moveSection(sIdx, "up")}
+                              disabled={sIdx === 0}
+                              className="p-0.5 text-neutral-400 hover:text-neutral-800 disabled:opacity-30 cursor-pointer"
+                            >
+                              <ChevronUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => moveSection(sIdx, "down")}
+                              disabled={sIdx === sectionOrder.length - 1}
+                              className="p-0.5 text-neutral-400 hover:text-neutral-800 disabled:opacity-30 cursor-pointer"
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => removeSection("projects")}
+                              className="p-0.5 text-neutral-400 hover:text-rose-500 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2.5">
+                        {(resumeData.projects || []).map((proj, pIdx) => (
+                          <div key={pIdx} className="group/proj relative">
+                            {/* Line 1: Project Name \hfill Date */}
+                            <div className="flex justify-between items-baseline font-bold text-[9.5pt]">
+                              <input
+                                type="text"
+                                value={proj.name || ""}
+                                onChange={(e) => {
                                   const newProj = [...(resumeData.projects || [])];
-                                  newProj[pIdx].bullets![bIdx] = val;
+                                  newProj[pIdx].name = e.target.value;
                                   setResumeData(prev => ({ ...prev, projects: newProj }));
                                 }}
-                                placeholder="Accomplished [X] using [Y] resulting in [Z]..."
-                                className="w-full bg-transparent hover:bg-neutral-50/80 focus:bg-blue-50/50 focus:outline-none rounded px-1 resize-none overflow-hidden text-neutral-800 leading-[1.28] min-w-0"
+                                placeholder="Project Name"
+                                className="font-bold text-[9.5pt] text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
                               />
-
-                              <div className="opacity-0 group-hover/pbullet:opacity-100 transition-opacity flex items-center gap-1 shrink-0 ml-1">
+                              <div className="flex items-center gap-1 shrink-0 ml-2">
+                                <input
+                                  type="text"
+                                  value={proj.date || ""}
+                                  onChange={(e) => {
+                                    const newProj = [...(resumeData.projects || [])];
+                                    newProj[pIdx].date = e.target.value;
+                                    setResumeData(prev => ({ ...prev, projects: newProj }));
+                                  }}
+                                  placeholder="Date"
+                                  className="font-bold text-[9pt] text-right text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-24 shrink-0"
+                                />
                                 <button
-                                  onClick={() => handleTriggerAiForBullet(b, "projects", pIdx, bIdx)}
-                                  className="p-1 rounded text-emerald-600 hover:bg-emerald-50 cursor-pointer flex items-center gap-1 text-[10px] font-semibold bg-emerald-50/50 border border-emerald-500/20"
-                                  title="AI Polish full bullet point"
+                                  onClick={() => {
+                                    const newProj = (resumeData.projects || []).filter((_, i) => i !== pIdx);
+                                    setResumeData(prev => ({ ...prev, projects: newProj }));
+                                  }}
+                                  className="opacity-0 group-hover/proj:opacity-100 text-neutral-400 hover:text-rose-500 cursor-pointer p-0.5 print:hidden"
+                                  title="Delete project"
                                 >
-                                  <Wand2 className="w-3 h-3" />
+                                  <Trash2 className="w-3 h-3" />
                                 </button>
+                              </div>
+                            </div>
+
+                            {/* Line 2: Technologies / Subtitle */}
+                            <div className="flex justify-between items-baseline text-[9pt] text-neutral-800 italic mb-0.5">
+                              <input
+                                type="text"
+                                value={proj.description || ""}
+                                onChange={(e) => {
+                                  const newProj = [...(resumeData.projects || [])];
+                                  newProj[pIdx].description = e.target.value;
+                                  setResumeData(prev => ({ ...prev, projects: newProj }));
+                                }}
+                                placeholder="Technologies (e.g. Next.js, TypeScript, PostgreSQL)"
+                                className="italic text-[9pt] text-neutral-800 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
+                              />
+                            </div>
+
+                            {/* Bullets */}
+                            <ul className="list-none space-y-1 mt-0.5 pl-3">
+                              {(proj.bullets || []).map((b, bIdx) => (
+                                <li key={bIdx} className="flex items-start gap-1.5 group/pbullet text-[9pt] leading-[1.28] text-neutral-800">
+                                  <span className="select-none font-bold text-neutral-900 mt-0.5 shrink-0">•</span>
+                                  <AutoResizeTextarea
+                                    value={b}
+                                    onChange={(val) => {
+                                      const newProj = [...(resumeData.projects || [])];
+                                      newProj[pIdx].bullets![bIdx] = val;
+                                      setResumeData(prev => ({ ...prev, projects: newProj }));
+                                    }}
+                                    placeholder="Accomplished [X] using [Y] resulting in [Z]..."
+                                    className="w-full bg-transparent hover:bg-neutral-50/80 focus:bg-blue-50/50 focus:outline-none rounded px-1 resize-none overflow-hidden text-neutral-800 leading-[1.28] min-w-0"
+                                  />
+
+                                  <div className="opacity-0 group-hover/pbullet:opacity-100 transition-opacity flex items-center gap-1 shrink-0 ml-1 print:hidden">
+                                    <button
+                                      onClick={() => handleTriggerAiForBullet(b, "projects", pIdx, bIdx)}
+                                      className="p-1 rounded text-emerald-600 hover:bg-emerald-50 cursor-pointer flex items-center gap-1 text-[10px] font-semibold bg-emerald-50/50 border border-emerald-500/20"
+                                      title="AI Polish full bullet"
+                                    >
+                                      <Wand2 className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        const newProj = [...(resumeData.projects || [])];
+                                        newProj[pIdx].bullets = newProj[pIdx].bullets!.filter((_, i) => i !== bIdx);
+                                        setResumeData(prev => ({ ...prev, projects: newProj }));
+                                      }}
+                                      className="p-1 rounded text-neutral-400 hover:text-rose-500 cursor-pointer"
+                                      title="Delete bullet"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </li>
+                              ))}
+
+                              <li className="pt-0.5 print:hidden">
                                 <button
                                   onClick={() => {
                                     const newProj = [...(resumeData.projects || [])];
-                                    newProj[pIdx].bullets = newProj[pIdx].bullets!.filter((_, i) => i !== bIdx);
+                                    newProj[pIdx].bullets = [...(newProj[pIdx].bullets || []), "Engineered optimized feature delivering measurable user engagement."];
                                     setResumeData(prev => ({ ...prev, projects: newProj }));
                                   }}
-                                  className="p-1 rounded text-neutral-400 hover:text-rose-500 cursor-pointer"
-                                  title="Delete bullet"
+                                  className="text-[8.5pt] font-semibold text-neutral-400 hover:text-neutral-800 flex items-center gap-1 cursor-pointer pl-3"
                                 >
-                                  <X className="w-3 h-3" />
+                                  <Plus className="w-2.5 h-2.5" />
+                                  <span>Add bullet</span>
                                 </button>
-                              </div>
-                            </li>
-                          ))}
+                              </li>
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
 
-                          <li className="pt-0.5">
+                // ── TECHNICAL SKILLS SECTION ──
+                if (sectionKey === "skills") {
+                  return (
+                    <div key="skills" className={`${getSectionMarginClass()} group/sec relative`}>
+                      <div className={`flex items-center justify-between pb-0.5 mb-1.5 border-b-[0.75pt] ${colorTheme.border}`}>
+                        <h2 className={`text-[10pt] font-bold uppercase tracking-wider ${colorTheme.text}`}>
+                          Technical Skills
+                        </h2>
+                        
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setResumeData(prev => ({
+                                ...prev,
+                                skills: [
+                                  ...(prev.skills || []),
+                                  { category: "Developer Tools", items: ["Git", "Docker", "Linux"] }
+                                ]
+                              }));
+                            }}
+                            className="text-[9px] font-bold text-neutral-500 hover:text-neutral-900 flex items-center gap-0.5 cursor-pointer opacity-70 hover:opacity-100 print:hidden"
+                          >
+                            <Plus className="w-2.5 h-2.5" />
+                            <span>Add Category</span>
+                          </button>
+
+                          <div className="opacity-0 group-hover/sec:opacity-100 transition-opacity flex items-center gap-1 print:hidden">
+                            <button
+                              onClick={() => moveSection(sIdx, "up")}
+                              disabled={sIdx === 0}
+                              className="p-0.5 text-neutral-400 hover:text-neutral-800 disabled:opacity-30 cursor-pointer"
+                            >
+                              <ChevronUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => moveSection(sIdx, "down")}
+                              disabled={sIdx === sectionOrder.length - 1}
+                              className="p-0.5 text-neutral-400 hover:text-neutral-800 disabled:opacity-30 cursor-pointer"
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => removeSection("skills")}
+                              className="p-0.5 text-neutral-400 hover:text-rose-500 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1 text-[9pt] leading-[1.3]">
+                        {(resumeData.skills || []).map((cat, catIdx) => (
+                          <div key={catIdx} className="flex items-baseline gap-1 group/skill relative">
+                            <input
+                              type="text"
+                              value={cat.category ? `${cat.category}:` : ""}
+                              onChange={(e) => {
+                                const newSkills = [...(resumeData.skills || [])];
+                                newSkills[catIdx].category = e.target.value.replace(/:$/, "");
+                                setResumeData(prev => ({ ...prev, skills: newSkills }));
+                              }}
+                              placeholder="Category:"
+                              style={{ width: `${Math.max((cat.category || "Category").length * 8 + 14, 110)}px` }}
+                              className="font-bold text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 shrink-0"
+                            />
+                            <input
+                              type="text"
+                              value={(cat.items || []).join(", ")}
+                              onChange={(e) => {
+                                const newSkills = [...(resumeData.skills || [])];
+                                newSkills[catIdx].items = e.target.value.split(",").map(s => s.trim()).filter(Boolean);
+                                setResumeData(prev => ({ ...prev, skills: newSkills }));
+                              }}
+                              placeholder="Comma-separated items (e.g. Python, TypeScript, Docker)"
+                              className="text-neutral-800 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 min-w-0 flex-1 font-normal"
+                            />
                             <button
                               onClick={() => {
-                                const newProj = [...(resumeData.projects || [])];
-                                newProj[pIdx].bullets = [...(newProj[pIdx].bullets || []), "Engineered optimized feature delivering measurable user engagement."];
-                                setResumeData(prev => ({ ...prev, projects: newProj }));
+                                const newSkills = (resumeData.skills || []).filter((_, i) => i !== catIdx);
+                                setResumeData(prev => ({ ...prev, skills: newSkills }));
                               }}
-                              className="text-[8.5pt] font-semibold text-neutral-400 hover:text-neutral-800 flex items-center gap-1 cursor-pointer pl-3"
+                              className="opacity-0 group-hover/skill:opacity-100 text-neutral-400 hover:text-rose-500 cursor-pointer p-0.5 shrink-0 print:hidden"
+                              title="Delete category"
                             >
-                              <Plus className="w-2.5 h-2.5" />
-                              <span>Add bullet</span>
+                              <Trash2 className="w-3 h-3" />
                             </button>
-                          </li>
-                        </ul>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ── 5. TECHNICAL SKILLS SECTION (Inline Categorized LaTeX Format) ── */}
-              <div>
-                <div className="flex items-center justify-between pb-0.5 mb-1.5 border-b-[0.75pt] border-neutral-900">
-                  <h2 className="text-[10pt] font-bold uppercase tracking-wider text-neutral-900">
-                    Technical Skills
-                  </h2>
-                  <button
-                    onClick={() => {
-                      setResumeData(prev => ({
-                        ...prev,
-                        skills: [
-                          ...(prev.skills || []),
-                          { category: "Developer Tools", items: ["Git", "Docker", "Linux"] }
-                        ]
-                      }));
-                    }}
-                    className="text-[9px] font-bold text-neutral-500 hover:text-neutral-900 flex items-center gap-0.5 cursor-pointer opacity-70 hover:opacity-100"
-                  >
-                    <Plus className="w-2.5 h-2.5" />
-                    <span>Add Category</span>
-                  </button>
-                </div>
-
-                <div className="space-y-1 text-[9pt] leading-[1.3]">
-                  {(resumeData.skills || []).map((cat, catIdx) => (
-                    <div key={catIdx} className="flex items-baseline gap-1 group/skill relative">
-                      <input
-                        type="text"
-                        value={cat.category ? `${cat.category}:` : ""}
-                        onChange={(e) => {
-                          const newSkills = [...(resumeData.skills || [])];
-                          newSkills[catIdx].category = e.target.value.replace(/:$/, "");
-                          setResumeData(prev => ({ ...prev, skills: newSkills }));
-                        }}
-                        placeholder="Category:"
-                        style={{ width: `${Math.max((cat.category || "Category").length * 8 + 14, 110)}px` }}
-                        className="font-bold text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 shrink-0"
-                      />
-                      <input
-                        type="text"
-                        value={(cat.items || []).join(", ")}
-                        onChange={(e) => {
-                          const newSkills = [...(resumeData.skills || [])];
-                          newSkills[catIdx].items = e.target.value.split(",").map(s => s.trim()).filter(Boolean);
-                          setResumeData(prev => ({ ...prev, skills: newSkills }));
-                        }}
-                        placeholder="Comma-separated items (e.g. Python, TypeScript, Docker)"
-                        className="text-neutral-800 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 min-w-0 flex-1 font-normal"
-                      />
-                      <button
-                        onClick={() => {
-                          const newSkills = (resumeData.skills || []).filter((_, i) => i !== catIdx);
-                          setResumeData(prev => ({ ...prev, skills: newSkills }));
-                        }}
-                        className="opacity-0 group-hover/skill:opacity-100 text-neutral-400 hover:text-rose-500 cursor-pointer p-0.5 shrink-0"
-                        title="Delete category"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
                     </div>
-                  ))}
-                </div>
+                  );
+                }
+
+                // ── CUSTOM / FREEFORM SECTIONS (Canva Style) ──
+                if (sectionKey === "custom" && resumeData.customSections && resumeData.customSections.length > 0) {
+                  return (
+                    <div key="custom">
+                      {resumeData.customSections.map((sec, secIdx) => (
+                        <div key={secIdx} className={`${getSectionMarginClass()} group/custom relative`}>
+                          <div className={`flex items-center justify-between pb-0.5 mb-1.5 border-b-[0.75pt] ${colorTheme.border}`}>
+                            <input
+                              type="text"
+                              value={sec.title || "Custom Section"}
+                              onChange={(e) => {
+                                const newCustom = [...(resumeData.customSections || [])];
+                                newCustom[secIdx].title = e.target.value;
+                                setResumeData(prev => ({ ...prev, customSections: newCustom }));
+                              }}
+                              className={`text-[10pt] font-bold uppercase tracking-wider ${colorTheme.text} bg-transparent hover:bg-neutral-50 focus:outline-none rounded px-1 -ml-1`}
+                            />
+
+                            <div className="flex items-center gap-1 print:hidden">
+                              <button
+                                onClick={() => {
+                                  const newCustom = [...(resumeData.customSections || [])];
+                                  newCustom[secIdx].bullets = [...(newCustom[secIdx].bullets || []), "Accomplished key objective with measurable impact."];
+                                  setResumeData(prev => ({ ...prev, customSections: newCustom }));
+                                }}
+                                className="text-[9px] font-bold text-neutral-500 hover:text-neutral-900 flex items-center gap-0.5 cursor-pointer"
+                              >
+                                <Plus className="w-2.5 h-2.5" />
+                                <span>Add Item</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const newCustom = (resumeData.customSections || []).filter((_, i) => i !== secIdx);
+                                  setResumeData(prev => ({ ...prev, customSections: newCustom }));
+                                }}
+                                className="opacity-0 group-hover/custom:opacity-100 text-neutral-400 hover:text-rose-500 cursor-pointer p-0.5"
+                                title="Delete section"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <ul className="list-none space-y-1 pl-3">
+                            {(sec.bullets || []).map((b, bIdx) => (
+                              <li key={bIdx} className="flex items-start gap-1.5 group/cbullet text-[9pt] leading-[1.28] text-neutral-800">
+                                <span className="select-none font-bold text-neutral-900 mt-0.5 shrink-0">•</span>
+                                <AutoResizeTextarea
+                                  value={b}
+                                  onChange={(val) => {
+                                    const newCustom = [...(resumeData.customSections || [])];
+                                    newCustom[secIdx].bullets![bIdx] = val;
+                                    setResumeData(prev => ({ ...prev, customSections: newCustom }));
+                                  }}
+                                  placeholder="Accomplished [X] with measurable result..."
+                                  className="w-full bg-transparent hover:bg-neutral-50/80 focus:bg-blue-50/50 focus:outline-none rounded px-1 resize-none overflow-hidden text-neutral-800 leading-[1.28] min-w-0"
+                                />
+
+                                <div className="opacity-0 group-hover/cbullet:opacity-100 transition-opacity flex items-center gap-1 shrink-0 ml-1 print:hidden">
+                                  <button
+                                    onClick={() => handleTriggerAiForBullet(b, "custom", secIdx, bIdx)}
+                                    className="p-1 rounded text-emerald-600 hover:bg-emerald-50 cursor-pointer"
+                                    title="AI Polish bullet"
+                                  >
+                                    <Wand2 className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const newCustom = [...(resumeData.customSections || [])];
+                                      newCustom[secIdx].bullets = newCustom[secIdx].bullets!.filter((_, i) => i !== bIdx);
+                                      setResumeData(prev => ({ ...prev, customSections: newCustom }));
+                                    }}
+                                    className="p-1 rounded text-neutral-400 hover:text-rose-500 cursor-pointer"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }
+
+                return null;
+              })}
+
+              {/* ── Canva Freedom: Add Custom Section Button ── */}
+              <div className="pt-3 border-t border-dashed border-neutral-300 print:hidden flex justify-center">
+                <button
+                  onClick={handleAddCustomSection}
+                  className="px-4 py-1.5 rounded-lg border border-dashed border-neutral-400 hover:border-neutral-800 text-neutral-600 hover:text-neutral-900 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Add Custom Section (Canva Style)</span>
+                </button>
               </div>
 
             </div>
@@ -1306,7 +1791,7 @@ export default function ResumeEditorPage() {
 
         {/* ── Right Drawer: AI Bullet Studio (Generates FULL complete bullet points) ── */}
         {showAiDrawer && (
-          <aside className="w-80 md:w-[420px] border-l border-border bg-card/95 backdrop-blur-xl p-5 flex flex-col justify-between shrink-0 shadow-2xl z-40 overflow-y-auto">
+          <aside className="w-80 md:w-[420px] border-l border-border bg-card/95 backdrop-blur-xl p-5 flex flex-col justify-between shrink-0 shadow-2xl z-40 overflow-y-auto print:hidden">
             <div>
               <div className="flex items-center justify-between pb-3 mb-4 border-b border-border">
                 <div className="flex items-center gap-2">
@@ -1315,7 +1800,7 @@ export default function ResumeEditorPage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-sm text-foreground">AI Bullet Studio</h3>
-                    <p className="text-[11px] text-muted-foreground">Full-sentence XYZ bullet generator</p>
+                    <p className="text-[11px] text-muted-foreground">Full-sentence Google XYZ generator</p>
                   </div>
                 </div>
                 <button
@@ -1347,7 +1832,7 @@ export default function ResumeEditorPage() {
                 </div>
               )}
 
-              {/* On-Demand Full Bullet Generator */}
+              {/* Full Bullet Generator Form */}
               <div className="p-4 rounded-xl bg-muted/40 border border-border space-y-3 mb-6">
                 <div className="flex items-center justify-between text-xs font-bold text-foreground">
                   <div className="flex items-center gap-1.5">
@@ -1531,7 +2016,7 @@ export default function ResumeEditorPage() {
 
         {/* ── Right Drawer: Target Job Description & Match Radar ── */}
         {showJdDrawer && (
-          <aside className="w-80 md:w-[400px] border-l border-border bg-card/95 backdrop-blur-xl p-5 flex flex-col justify-between shrink-0 shadow-2xl z-40 overflow-y-auto">
+          <aside className="w-80 md:w-[400px] border-l border-border bg-card/95 backdrop-blur-xl p-5 flex flex-col justify-between shrink-0 shadow-2xl z-40 overflow-y-auto print:hidden">
             <div>
               <div className="flex items-center justify-between pb-3 mb-4 border-b border-border">
                 <div className="flex items-center gap-2">
@@ -1637,6 +2122,38 @@ export default function ResumeEditorPage() {
         )}
 
       </div>
+
+      {/* ── Print Stylesheet (High-Res 100% WYSIWYG Print to PDF) ── */}
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: letter;
+            margin: 0.4in;
+          }
+          body {
+            background: white !important;
+            color: black !important;
+          }
+          header, aside, button, input[type="file"], .print\\:hidden {
+            display: none !important;
+          }
+          #resume-canvas-sheet {
+            box-shadow: none !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            min-height: auto !important;
+          }
+          input, textarea {
+            border: none !important;
+            background: transparent !important;
+            resize: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+          }
+        }
+      `}</style>
 
     </div>
   );

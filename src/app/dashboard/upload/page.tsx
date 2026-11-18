@@ -47,6 +47,22 @@ export default function UploadPage() {
       }
 
       setExtractedText(data.text);
+
+      // Cache PDF Data URL for Split View in Editor
+      if (selectedFile.type === "application/pdf" || selectedFile.name.toLowerCase().endsWith(".pdf")) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const res = e.target?.result as string;
+          if (res) {
+            try {
+              sessionStorage.setItem("uploadedPdfDataUrl", res);
+            } catch (err) {
+              console.warn("File too large for sessionStorage", err);
+            }
+          }
+        };
+        reader.readAsDataURL(selectedFile);
+      }
     } catch (error: unknown) {
       console.error(error);
       const errorMessage = error instanceof Error ? error.message : "Failed to parse document";

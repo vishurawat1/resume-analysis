@@ -43,6 +43,11 @@ export interface ResumeData {
     issuer?: string;
     date?: string;
   }>;
+  customSections?: Array<{
+    title: string;
+    content?: string;
+    bullets?: string[];
+  }>;
 }
 
 // ── Exact LaTeX / Jake's Resume (Overleaf) Stylesheet ──
@@ -363,6 +368,20 @@ export const ResumeDocument = ({ data }: { data: ResumeData }) => {
             ))}
           </View>
         )}
+
+        {/* ── Custom Sections (Canva Style) ── */}
+        {data.customSections && data.customSections.map((sec, idx) => (
+          <View key={idx}>
+            <Text style={styles.sectionHeader}>{sec.title}</Text>
+            {sec.content && <Text style={styles.summaryText}>{sec.content}</Text>}
+            {sec.bullets && sec.bullets.map((b, i) => (
+              <View key={i} style={styles.bulletRow}>
+                <Text style={styles.bulletPoint}>•</Text>
+                <Text style={styles.bulletContent}>{formatBullet(b)}</Text>
+              </View>
+            ))}
+          </View>
+        ))}
 
       </Page>
     </Document>
