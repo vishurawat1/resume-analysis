@@ -1,3 +1,4 @@
+import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Link } from '@react-pdf/renderer';
 
 export interface ResumeData {
@@ -44,137 +45,157 @@ export interface ResumeData {
   }>;
 }
 
+// ── Exact LaTeX / Jake's Resume (Overleaf) Stylesheet ──
 const styles = StyleSheet.create({
   page: {
-    paddingTop: 32,
-    paddingBottom: 32,
-    paddingHorizontal: 36, // ~0.5 inch margins
-    fontFamily: 'Helvetica',
+    paddingTop: 28,
+    paddingBottom: 28,
+    paddingHorizontal: 36, // Exact 0.5 inch margins
+    fontFamily: 'Times-Roman',
     fontSize: 9.5,
-    lineHeight: 1.35,
-    color: '#1e293b',
+    lineHeight: 1.25,
+    color: '#000000',
   },
+
   // Header / Personal Info
   headerContainer: {
-    marginBottom: 10,
+    width: '100%',
     alignItems: 'center',
+    marginBottom: 4,
   },
   name: {
-    fontSize: 20,
-    fontFamily: 'Helvetica-Bold',
-    color: '#0f172a',
+    fontSize: 21,
+    fontFamily: 'Times-Bold',
+    color: '#000000',
+    textAlign: 'center',
     letterSpacing: 0.5,
-    marginBottom: 4,
     textTransform: 'uppercase',
   },
+  nameSpacer: {
+    height: 13, // Absorbs Times-Bold font descent & provides crisp 4pt separation
+    width: '100%',
+  },
   contactRow: {
+    width: '100%',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     flexWrap: 'wrap',
-    fontSize: 8.5,
-    color: '#475569',
   },
-  contactItem: {
-    marginHorizontal: 3,
+  contactText: {
+    fontSize: 8.5,
+    color: '#111111',
   },
   contactLink: {
-    color: '#2563eb',
+    fontSize: 8.5,
+    color: '#000000',
     textDecoration: 'none',
   },
-  dividerDot: {
-    color: '#94a3b8',
-    marginHorizontal: 3,
+  contactSeparator: {
+    fontSize: 8.5,
+    color: '#444444',
+    marginHorizontal: 3.5,
+  },
+  afterHeaderSpacer: {
+    height: 6,
+    width: '100%',
   },
 
-  // Section Headers
+  // LaTeX Section Headers (\section with \titlerule)
   sectionHeader: {
     fontSize: 10,
-    fontFamily: 'Helvetica-Bold',
-    color: '#0f172a',
+    fontFamily: 'Times-Bold',
+    color: '#000000',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2563eb',
-    paddingBottom: 2,
-    marginTop: 8,
-    marginBottom: 5,
-  },
-
-  // Summary
-  summary: {
-    fontSize: 9,
-    lineHeight: 1.4,
-    color: '#334155',
+    letterSpacing: 0.6,
+    borderBottomWidth: 0.75,
+    borderBottomColor: '#000000',
+    paddingBottom: 1.5,
+    marginTop: 6,
     marginBottom: 4,
   },
 
-  // Experience / Projects / Education Entries
-  entryContainer: {
-    marginBottom: 6,
+  // Summary (if present)
+  summaryText: {
+    fontSize: 9,
+    lineHeight: 1.3,
+    color: '#111111',
+    marginBottom: 4,
   },
-  entryHeaderRow: {
+
+  // LaTeX Subheading Item (\resumeSubheading)
+  entryContainer: {
+    marginBottom: 4.5,
+  },
+  subheadingRow1: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 1,
+  },
+  subheadingRow2: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
     marginBottom: 1.5,
   },
-  primaryTitle: {
-    fontFamily: 'Helvetica-Bold',
-    fontSize: 10,
-    color: '#0f172a',
-  },
-  secondaryTitle: {
-    fontFamily: 'Helvetica-Bold',
+  boldLeft: {
+    fontFamily: 'Times-Bold',
     fontSize: 9.5,
-    color: '#1e293b',
+    color: '#000000',
   },
-  subtitle: {
-    fontFamily: 'Helvetica-Oblique',
+  boldRight: {
+    fontFamily: 'Times-Bold',
     fontSize: 9,
-    color: '#334155',
+    color: '#000000',
+    textAlign: 'right',
   },
-  dateLocation: {
-    fontSize: 8.5,
-    color: '#64748b',
+  italicLeft: {
+    fontFamily: 'Times-Italic',
+    fontSize: 9,
+    color: '#111111',
+  },
+  italicRight: {
+    fontFamily: 'Times-Italic',
+    fontSize: 9,
+    color: '#222222',
     textAlign: 'right',
   },
 
-  // Bullet Points
+  // LaTeX Itemize Bullets (\resumeItemListStart / \resumeItem)
   bulletRow: {
     flexDirection: 'row',
-    marginBottom: 2,
-    paddingLeft: 4,
+    marginBottom: 1.5,
+    paddingLeft: 10,
   },
   bulletPoint: {
-    width: 10,
-    fontSize: 8.5,
-    color: '#2563eb',
+    width: 8,
+    fontSize: 7.5,
+    color: '#000000',
+    paddingTop: 1,
   },
   bulletContent: {
     flex: 1,
     fontSize: 9,
-    lineHeight: 1.35,
-    color: '#334155',
+    lineHeight: 1.25,
+    color: '#111111',
   },
 
-  // Skills
-  skillsContainer: {
-    marginTop: 2,
-  },
+  // LaTeX Skills Row (\textbf{Category}{: items})
   skillRow: {
     flexDirection: 'row',
-    marginBottom: 2.5,
+    marginBottom: 2,
     fontSize: 9,
+    lineHeight: 1.25,
   },
   skillCategory: {
-    fontFamily: 'Helvetica-Bold',
-    color: '#0f172a',
-    marginRight: 4,
+    fontFamily: 'Times-Bold',
+    color: '#000000',
+    marginRight: 3,
   },
   skillItems: {
     flex: 1,
-    color: '#334155',
+    color: '#111111',
   },
 });
 
@@ -188,142 +209,69 @@ const formatBullet = (bullet: string) => {
 };
 
 export const ResumeDocument = ({ data }: { data: ResumeData }) => {
+  const p = data.personalInfo;
+
+  // Build clean contact items
+  const contactParts: Array<{ text: string; link?: string }> = [];
+  if (p?.phone) contactParts.push({ text: p.phone });
+  if (p?.email) contactParts.push({ text: p.email, link: `mailto:${p.email}` });
+  if (p?.location) contactParts.push({ text: p.location });
+  if (p?.linkedin) contactParts.push({ text: cleanDisplayUrl(p.linkedin), link: p.linkedin.startsWith('http') ? p.linkedin : `https://${p.linkedin}` });
+  if (p?.github) contactParts.push({ text: cleanDisplayUrl(p.github), link: p.github.startsWith('http') ? p.github : `https://${p.github}` });
+  if (p?.portfolio) contactParts.push({ text: cleanDisplayUrl(p.portfolio), link: p.portfolio.startsWith('http') ? p.portfolio : `https://${p.portfolio}` });
+
   return (
     <Document>
       <Page size="LETTER" style={styles.page}>
         
-        {/* Personal Info Header */}
-        {data.personalInfo && (
+        {/* ── LaTeX Header ── */}
+        {p && (
           <View style={styles.headerContainer}>
-            {data.personalInfo.name && <Text style={styles.name}>{data.personalInfo.name}</Text>}
+            {p.name && <Text style={styles.name}>{p.name}</Text>}
+            <View style={styles.nameSpacer} />
             <View style={styles.contactRow}>
-              {data.personalInfo.location && (
-                <Text style={styles.contactItem}>{data.personalInfo.location}</Text>
-              )}
-              {data.personalInfo.phone && (
-                <>
-                  <Text style={styles.dividerDot}>•</Text>
-                  <Text style={styles.contactItem}>{data.personalInfo.phone}</Text>
-                </>
-              )}
-              {data.personalInfo.email && (
-                <>
-                  <Text style={styles.dividerDot}>•</Text>
-                  <Link src={`mailto:${data.personalInfo.email}`} style={[styles.contactItem, styles.contactLink]}>
-                    {data.personalInfo.email}
-                  </Link>
-                </>
-              )}
-              {data.personalInfo.linkedin && (
-                <>
-                  <Text style={styles.dividerDot}>•</Text>
-                  <Link src={data.personalInfo.linkedin.startsWith('http') ? data.personalInfo.linkedin : `https://${data.personalInfo.linkedin}`} style={[styles.contactItem, styles.contactLink]}>
-                    {cleanDisplayUrl(data.personalInfo.linkedin)}
-                  </Link>
-                </>
-              )}
-              {data.personalInfo.github && (
-                <>
-                  <Text style={styles.dividerDot}>•</Text>
-                  <Link src={data.personalInfo.github.startsWith('http') ? data.personalInfo.github : `https://${data.personalInfo.github}`} style={[styles.contactItem, styles.contactLink]}>
-                    {cleanDisplayUrl(data.personalInfo.github)}
-                  </Link>
-                </>
-              )}
-              {data.personalInfo.portfolio && (
-                <>
-                  <Text style={styles.dividerDot}>•</Text>
-                  <Link src={data.personalInfo.portfolio.startsWith('http') ? data.personalInfo.portfolio : `https://${data.personalInfo.portfolio}`} style={[styles.contactItem, styles.contactLink]}>
-                    {cleanDisplayUrl(data.personalInfo.portfolio)}
-                  </Link>
-                </>
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* Professional Summary */}
-        {data.summary && (
-          <View>
-            <Text style={styles.sectionHeader}>Professional Summary</Text>
-            <Text style={styles.summary}>{data.summary}</Text>
-          </View>
-        )}
-
-        {/* Technical Skills */}
-        {data.skills && data.skills.length > 0 && (
-          <View style={{ marginBottom: 4 }}>
-            <Text style={styles.sectionHeader}>Technical Skills</Text>
-            <View style={styles.skillsContainer}>
-              {data.skills.map((skill, idx) => (
-                <View key={idx} style={styles.skillRow}>
-                  <Text style={styles.skillCategory}>{skill.category}:</Text>
-                  <Text style={styles.skillItems}>{skill.items?.join(', ')}</Text>
-                </View>
+              {contactParts.map((item, idx) => (
+                <React.Fragment key={idx}>
+                  {idx > 0 && <Text style={styles.contactSeparator}>|</Text>}
+                  {item.link ? (
+                    <Link src={item.link} style={styles.contactLink}>
+                      {item.text}
+                    </Link>
+                  ) : (
+                    <Text style={styles.contactText}>{item.text}</Text>
+                  )}
+                </React.Fragment>
               ))}
             </View>
           </View>
         )}
+        <View style={styles.afterHeaderSpacer} />
 
-        {/* Work Experience */}
-        {data.experience && data.experience.length > 0 && (
+        {/* ── Professional Summary (Optional) ── */}
+        {data.summary && (
           <View>
-            <Text style={styles.sectionHeader}>Work Experience</Text>
-            {data.experience.map((exp, idx) => (
-              <View key={idx} style={styles.entryContainer}>
-                <View style={styles.entryHeaderRow}>
-                  <Text style={styles.primaryTitle}>{exp.role || exp.company}</Text>
-                  <Text style={styles.dateLocation}>{exp.date}</Text>
-                </View>
-                <View style={styles.entryHeaderRow}>
-                  <Text style={styles.subtitle}>{exp.company} {exp.location ? `| ${exp.location}` : ''}</Text>
-                </View>
-                {exp.bullets && exp.bullets.map((b, i) => (
-                  <View key={i} style={styles.bulletRow}>
-                    <Text style={styles.bulletPoint}>•</Text>
-                    <Text style={styles.bulletContent}>{formatBullet(b)}</Text>
-                  </View>
-                ))}
-              </View>
-            ))}
+            <Text style={styles.sectionHeader}>Professional Summary</Text>
+            <Text style={styles.summaryText}>{data.summary}</Text>
           </View>
         )}
 
-        {/* Key Projects */}
-        {data.projects && data.projects.length > 0 && (
-          <View>
-            <Text style={styles.sectionHeader}>Key Projects</Text>
-            {data.projects.map((proj, idx) => (
-              <View key={idx} style={styles.entryContainer}>
-                <View style={styles.entryHeaderRow}>
-                  <Text style={styles.secondaryTitle}>{proj.name}</Text>
-                  <Text style={styles.dateLocation}>{proj.date}</Text>
-                </View>
-                {proj.description && <Text style={styles.subtitle}>{proj.description}</Text>}
-                {proj.bullets && proj.bullets.map((b, i) => (
-                  <View key={i} style={styles.bulletRow}>
-                    <Text style={styles.bulletPoint}>•</Text>
-                    <Text style={styles.bulletContent}>{formatBullet(b)}</Text>
-                  </View>
-                ))}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Education */}
+        {/* ── Education (Jake's LaTeX Position #1) ── */}
         {data.education && data.education.length > 0 && (
           <View>
             <Text style={styles.sectionHeader}>Education</Text>
             {data.education.map((edu, idx) => (
               <View key={idx} style={styles.entryContainer}>
-                <View style={styles.entryHeaderRow}>
-                  <Text style={styles.primaryTitle}>{edu.institution}</Text>
-                  <Text style={styles.dateLocation}>{edu.location ? `${edu.location}` : edu.date}</Text>
+                {/* Line 1: School (Bold) \hfill Location (Bold) */}
+                <View style={styles.subheadingRow1}>
+                  <Text style={styles.boldLeft}>{edu.institution}</Text>
+                  <Text style={styles.boldRight}>{edu.location || ''}</Text>
                 </View>
-                <View style={styles.entryHeaderRow}>
-                  <Text style={styles.subtitle}>{edu.degree} {edu.gpa ? `| GPA: ${edu.gpa}` : ''}</Text>
-                  {edu.location && <Text style={styles.dateLocation}>{edu.date}</Text>}
+                {/* Line 2: Degree & GPA (Italic) \hfill Date (Italic) */}
+                <View style={styles.subheadingRow2}>
+                  <Text style={styles.italicLeft}>
+                    {edu.degree}{edu.gpa ? `; GPA: ${edu.gpa}` : ''}
+                  </Text>
+                  <Text style={styles.italicRight}>{edu.date || ''}</Text>
                 </View>
                 {edu.bullets && edu.bullets.map((b, i) => (
                   <View key={i} style={styles.bulletRow}>
@@ -336,14 +284,81 @@ export const ResumeDocument = ({ data }: { data: ResumeData }) => {
           </View>
         )}
 
-        {/* Certifications & Credentials */}
+        {/* ── Work Experience ── */}
+        {data.experience && data.experience.length > 0 && (
+          <View>
+            <Text style={styles.sectionHeader}>Experience</Text>
+            {data.experience.map((exp, idx) => (
+              <View key={idx} style={styles.entryContainer}>
+                {/* Line 1: Company (Bold) \hfill Location (Bold) */}
+                <View style={styles.subheadingRow1}>
+                  <Text style={styles.boldLeft}>{exp.company || exp.role}</Text>
+                  <Text style={styles.boldRight}>{exp.location || ''}</Text>
+                </View>
+                {/* Line 2: Role (Italic) \hfill Dates (Italic) */}
+                <View style={styles.subheadingRow2}>
+                  <Text style={styles.italicLeft}>{exp.role || ''}</Text>
+                  <Text style={styles.italicRight}>{exp.date || ''}</Text>
+                </View>
+                {/* Bullets */}
+                {exp.bullets && exp.bullets.map((b, i) => (
+                  <View key={i} style={styles.bulletRow}>
+                    <Text style={styles.bulletPoint}>•</Text>
+                    <Text style={styles.bulletContent}>{formatBullet(b)}</Text>
+                  </View>
+                ))}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* ── Projects ── */}
+        {data.projects && data.projects.length > 0 && (
+          <View>
+            <Text style={styles.sectionHeader}>Projects</Text>
+            {data.projects.map((proj, idx) => (
+              <View key={idx} style={styles.entryContainer}>
+                <View style={styles.subheadingRow1}>
+                  <Text style={styles.boldLeft}>{proj.name}</Text>
+                  <Text style={styles.boldRight}>{proj.date || ''}</Text>
+                </View>
+                {proj.description && (
+                  <View style={styles.subheadingRow2}>
+                    <Text style={styles.italicLeft}>{proj.description}</Text>
+                  </View>
+                )}
+                {proj.bullets && proj.bullets.map((b, i) => (
+                  <View key={i} style={styles.bulletRow}>
+                    <Text style={styles.bulletPoint}>•</Text>
+                    <Text style={styles.bulletContent}>{formatBullet(b)}</Text>
+                  </View>
+                ))}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* ── Technical Skills ── */}
+        {data.skills && data.skills.length > 0 && (
+          <View>
+            <Text style={styles.sectionHeader}>Technical Skills</Text>
+            {data.skills.map((skill, idx) => (
+              <View key={idx} style={styles.skillRow}>
+                <Text style={styles.skillCategory}>{skill.category}:</Text>
+                <Text style={styles.skillItems}>{skill.items?.join(', ')}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* ── Certifications (Optional) ── */}
         {data.certifications && data.certifications.length > 0 && (
           <View>
             <Text style={styles.sectionHeader}>Certifications</Text>
             {data.certifications.map((cert, idx) => (
-              <View key={idx} style={styles.entryHeaderRow}>
-                <Text style={styles.secondaryTitle}>{cert.name} {cert.issuer ? `– ${cert.issuer}` : ''}</Text>
-                {cert.date && <Text style={styles.dateLocation}>{cert.date}</Text>}
+              <View key={idx} style={styles.subheadingRow1}>
+                <Text style={styles.boldLeft}>{cert.name} {cert.issuer ? `– ${cert.issuer}` : ''}</Text>
+                <Text style={styles.italicRight}>{cert.date || ''}</Text>
               </View>
             ))}
           </View>

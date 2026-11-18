@@ -741,58 +741,56 @@ export default function ResumeEditorPage() {
                   {(resumeData.experience || []).map((exp, expIdx) => (
                     <div key={expIdx} className="group/exp relative">
                       
-                      {/* Top Line: Role & Company | Date & Location */}
+                      {/* Row 1: Company (Bold) \hfill Location */}
                       <div className="flex justify-between items-baseline font-bold text-[9.5pt]">
-                        <div className="flex items-center gap-1.5 flex-1">
-                          <input
-                            type="text"
-                            value={exp.role || ""}
-                            onChange={(e) => {
-                              const newExp = [...(resumeData.experience || [])];
-                              newExp[expIdx].role = e.target.value;
-                              setResumeData(prev => ({ ...prev, experience: newExp }));
-                            }}
-                            placeholder="Job Title"
-                            className="font-bold text-[9.5pt] text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1"
-                          />
-                          <span className="font-normal text-neutral-500">|</span>
-                          <input
-                            type="text"
-                            value={exp.company || ""}
-                            onChange={(e) => {
-                              const newExp = [...(resumeData.experience || [])];
-                              newExp[expIdx].company = e.target.value;
-                              setResumeData(prev => ({ ...prev, experience: newExp }));
-                            }}
-                            placeholder="Company Name"
-                            className="font-semibold text-[9.5pt] text-neutral-800 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1"
-                          />
-                        </div>
+                        <input
+                          type="text"
+                          value={exp.company || ""}
+                          onChange={(e) => {
+                            const newExp = [...(resumeData.experience || [])];
+                            newExp[expIdx].company = e.target.value;
+                            setResumeData(prev => ({ ...prev, experience: newExp }));
+                          }}
+                          placeholder="Company Name"
+                          className="font-bold text-[9.5pt] text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 flex-1"
+                        />
+                        <input
+                          type="text"
+                          value={exp.location || ""}
+                          onChange={(e) => {
+                            const newExp = [...(resumeData.experience || [])];
+                            newExp[expIdx].location = e.target.value;
+                            setResumeData(prev => ({ ...prev, experience: newExp }));
+                          }}
+                          placeholder="City, State"
+                          className="font-normal text-[9pt] text-right text-neutral-700 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-32 shrink-0"
+                        />
+                      </div>
 
-                        <div className="flex items-center gap-1 shrink-0 text-[9pt]">
-                          <input
-                            type="text"
-                            value={exp.date || ""}
-                            onChange={(e) => {
-                              const newExp = [...(resumeData.experience || [])];
-                              newExp[expIdx].date = e.target.value;
-                              setResumeData(prev => ({ ...prev, experience: newExp }));
-                            }}
-                            placeholder="Dates"
-                            className="font-normal text-right text-neutral-700 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-32"
-                          />
-                          <input
-                            type="text"
-                            value={exp.location || ""}
-                            onChange={(e) => {
-                              const newExp = [...(resumeData.experience || [])];
-                              newExp[expIdx].location = e.target.value;
-                              setResumeData(prev => ({ ...prev, experience: newExp }));
-                            }}
-                            placeholder="Location"
-                            className="font-normal text-right text-neutral-600 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-28"
-                          />
-                        </div>
+                      {/* Row 2: Role (Italic) \hfill Dates */}
+                      <div className="flex justify-between items-baseline text-[9pt] text-neutral-800 italic mb-0.5">
+                        <input
+                          type="text"
+                          value={exp.role || ""}
+                          onChange={(e) => {
+                            const newExp = [...(resumeData.experience || [])];
+                            newExp[expIdx].role = e.target.value;
+                            setResumeData(prev => ({ ...prev, experience: newExp }));
+                          }}
+                          placeholder="Role / Title"
+                          className="italic text-[9pt] text-neutral-800 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 flex-1"
+                        />
+                        <input
+                          type="text"
+                          value={exp.date || ""}
+                          onChange={(e) => {
+                            const newExp = [...(resumeData.experience || [])];
+                            newExp[expIdx].date = e.target.value;
+                            setResumeData(prev => ({ ...prev, experience: newExp }));
+                          }}
+                          placeholder="Dates"
+                          className="not-italic text-[9pt] text-right text-neutral-700 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-32 shrink-0"
+                        />
                       </div>
 
                       {/* Bullets (Clean, Tight ATS Indent) */}
