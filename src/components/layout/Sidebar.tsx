@@ -11,7 +11,8 @@ import {
   Sparkles, 
   Wand2,
   FileCheck,
-  CheckCircle2
+  CheckCircle2,
+  FileEdit
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,7 @@ interface NavItem {
   icon: React.ElementType;
   description: string;
   highlight?: boolean;
+  badge?: string;
 }
 
 const navigation: NavItem[] = [
@@ -30,6 +32,13 @@ const navigation: NavItem[] = [
     icon: UploadCloud,
     description: "Target job match & analysis",
     highlight: true,
+  },
+  { 
+    name: "In-App Resume Studio", 
+    href: "/dashboard/editor", 
+    icon: FileEdit,
+    description: "Canva-style editor & 1-click AI",
+    badge: "New",
   },
   { 
     name: "ATS Score & Report", 
@@ -133,6 +142,11 @@ export function Sidebar({
                     </span>
                     {item.highlight && !isActive && (
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    )}
+                    {item.badge && !isActive && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20 uppercase tracking-tight">
+                        {item.badge}
+                      </span>
                     )}
                   </div>
                   <span className={cn(

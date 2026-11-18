@@ -13,7 +13,7 @@ import { CompanyIntelligenceCard, CompanyIntelligence } from "@/components/analy
 import { SeniorityMarketCard, SeniorityFit } from "@/components/analysis/SeniorityMarketCard";
 import { DownloadResumeButton } from "@/components/pdf/DownloadResumeButton";
 import { SaveAnalysisButton } from "@/components/analysis/SaveAnalysisButton";
-import { ChevronRight, FileText, Loader2, AlertCircle, Sparkles, Target, TrendingUp } from "lucide-react";
+import { ChevronRight, FileText, Loader2, AlertCircle, Sparkles, Target, TrendingUp, FileEdit, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
@@ -111,6 +111,7 @@ export default function AnalysisPage() {
             setAiError(data.error);
           } else {
             setAiResult(data);
+            sessionStorage.setItem("aiResult", JSON.stringify(data));
           }
         })
         .catch((err) => {
@@ -178,7 +179,14 @@ export default function AnalysisPage() {
           </div>
         </div>
         
-        <div className="flex gap-3 print:hidden">
+        <div className="flex flex-wrap items-center gap-2.5 print:hidden">
+          <Link
+            href="/dashboard/editor"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-foreground text-background text-xs font-bold hover:opacity-90 transition-all shadow-xs cursor-pointer"
+          >
+            <FileEdit className="w-3.5 h-3.5" />
+            <span>Open in Resume Studio</span>
+          </Link>
           <DownloadResumeButton resumeText={optimizedResumeText} fileName={"Optimized_" + fileName} />
           {aiResult && <SaveAnalysisButton resumeText={optimizedResumeText} atsScore={aiResult.overallScore} />}
         </div>
@@ -333,9 +341,19 @@ export default function AnalysisPage() {
 
           {/* Interactive Improvement Engine */}
           <motion.div variants={itemVariants} className="space-y-6 pt-4">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight mb-2">Interactive AI Improvements</h2>
-              <p className="text-muted-foreground">Review the AI-generated suggestions below. Accepting a suggestion will instantly optimize your resume draft for download.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight mb-2">Interactive AI Improvements</h2>
+                <p className="text-muted-foreground text-sm">Review the AI-generated suggestions below or embed them live on a visual document canvas.</p>
+              </div>
+              <Link
+                href="/dashboard/editor"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-xs font-bold hover:bg-primary/90 transition-all shadow-xs shrink-0 cursor-pointer"
+              >
+                <FileEdit className="w-4 h-4" />
+                <span>Live Canvas Editor</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
             
             <div className="space-y-4">

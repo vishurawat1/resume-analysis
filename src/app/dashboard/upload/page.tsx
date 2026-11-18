@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Dropzone } from "@/components/ui/Dropzone";
-import { Building, MapPin, Search, FileText, AlertCircle, Loader2 } from "lucide-react";
+import { Building, MapPin, Search, FileText, AlertCircle, Loader2, FileEdit } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -170,12 +170,35 @@ export default function UploadPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.2 }}
-        className="flex justify-end pt-4"
+        className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4"
       >
+        <button
+          type="button"
+          disabled={!file || !extractedText || isParsing || isSaving}
+          onClick={() => {
+            if (extractedText) {
+              sessionStorage.setItem("resumeText", extractedText);
+              sessionStorage.setItem("jobDescription", jobDescription);
+              sessionStorage.setItem("fileName", file?.name || "resume.pdf");
+              sessionStorage.setItem("jobTitle", jobTitle);
+              sessionStorage.setItem("company", company);
+              sessionStorage.setItem("location", location);
+            }
+            router.push("/dashboard/editor");
+          }}
+          className={cn(
+            "w-full sm:w-auto px-6 py-3 rounded-xl border border-border bg-card text-foreground font-semibold transition-all text-sm flex items-center justify-center gap-2 cursor-pointer hover:bg-muted shadow-xs",
+            (!file || !extractedText) && "opacity-60 cursor-not-allowed"
+          )}
+        >
+          <FileEdit className="w-4 h-4 text-primary" />
+          <span>Open in Resume Studio</span>
+        </button>
+
         <button
           disabled={!file || !extractedText || jobDescription.length <= 10 || isSaving}
           className={cn(
-            "rounded-md px-8 py-3 text-sm font-semibold transition-all flex items-center justify-center min-w-[160px]",
+            "w-full sm:w-auto rounded-xl px-8 py-3 text-sm font-semibold transition-all flex items-center justify-center min-w-[160px] cursor-pointer",
             file && extractedText && jobDescription.length > 10
               ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md"
               : "bg-muted text-muted-foreground cursor-not-allowed opacity-70"
