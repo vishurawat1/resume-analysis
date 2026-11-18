@@ -252,8 +252,16 @@ export default function LoginPage() {
       setDebugData(collectedDebug);
 
       if (error.code === "auth/popup-blocked") {
-        setError("Popup was blocked by your browser. Please allow popups or use the Redirect option below.");
-        setLoading(false);
+        console.log("⚠️ Popup blocked by browser! Auto-initiating signInWithRedirect fallback...");
+        try {
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectErr: unknown) {
+          const rErr = redirectErr as { code?: string; message?: string };
+          console.error("❌ Fallback signInWithRedirect failed:", rErr);
+          setError("Your browser blocked the popup, and redirect failed. Please check browser permissions.");
+          setLoading(false);
+        }
       } else if (error.code === "auth/popup-closed-by-user") {
         setTimeout(() => {
           if (auth.currentUser) {
