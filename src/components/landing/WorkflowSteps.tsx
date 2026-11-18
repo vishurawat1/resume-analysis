@@ -2,27 +2,27 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Download, ArrowRight, Layers, FileUp } from "lucide-react";
+import { Sparkles, Download, ArrowRight, Layers, FileUp, ShieldCheck } from "lucide-react";
 
 const STEPS = [
   {
     step: "01",
-    title: "Upload Your Resume & Target Job",
-    description: "Drop in your existing resume in PDF or DOCX format alongside the job description you want to target.",
+    title: "Upload Resume & Job Requisition",
+    description: "Drop in your existing resume (PDF or DOCX) alongside the target job description, employer company name, and job location.",
     icon: FileUp,
     accent: "bg-blue-500/10 text-blue-500 border-blue-500/20",
   },
   {
     step: "02",
-    title: "AI ATS Simulation & Gap Analysis",
-    description: "Our algorithm runs your resume through simulated Workday, Greenhouse, and Lever parsers to reveal exactly what's missing.",
+    title: "360° AI ATS & Job Intelligence",
+    description: "Our engine computes your Workday/Greenhouse ATS score, verifies company legitimacy, checks commute distance, and audits keyword saturation.",
     icon: Sparkles,
     accent: "bg-primary/10 text-primary border-primary/20",
   },
   {
     step: "03",
-    title: "Apply Instant Fixes & Fast-Track Interviews",
-    description: "Incorporate targeted keyword suggestions, rewrite bullets with quantifiable metrics, and apply with 100% confidence.",
+    title: "1-Click Polish & Executive PDF Export",
+    description: "Accept AI-quantified bullet rewrites, eliminate recruiter red flags, and download an ATS-proof vector PDF ready for immediate submission.",
     icon: Download,
     accent: "bg-amber-500/10 text-amber-500 border-amber-500/20",
   },
@@ -43,7 +43,7 @@ export function WorkflowSteps() {
             How AI Resume Analyzer transforms your job search
           </h2>
           <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
-            From initial document upload to an interview-ready resume in less than 60 seconds.
+            From initial document upload to an interview-ready, verified application in less than 60 seconds.
           </p>
         </div>
 
@@ -58,7 +58,7 @@ export function WorkflowSteps() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: idx * 0.15 }}
-                className="relative rounded-2xl border border-border bg-card p-6 md:p-8 flex flex-col justify-between shadow-sm hover:shadow-lg transition-all duration-300 group"
+                className="relative rounded-2xl border border-border bg-card p-6 md:p-8 flex flex-col justify-between shadow-xs hover:shadow-lg transition-all duration-300 group"
               >
                 <div>
                   <div className="flex items-center justify-between mb-6">

@@ -11,7 +11,10 @@ import {
   Sparkles, 
   Sun, 
   UploadCloud, 
-  Zap 
+  Zap,
+  MapPin,
+  Building2,
+  SlidersHorizontal
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
@@ -19,10 +22,12 @@ import SplashCursor from "@/components/SplashCursor";
 import { AtsPlatformsMarquee } from "@/components/landing/AtsPlatformsMarquee";
 import { LiveTelemetryMarquee } from "@/components/landing/LiveTelemetryMarquee";
 import { HeroScannerGraphic } from "@/components/landing/HeroScannerGraphic";
+import { AppExperienceShowcase } from "@/components/landing/AppExperienceShowcase";
 import { InteractiveComparison } from "@/components/landing/InteractiveComparison";
 import { MotionFeaturesGrid } from "@/components/landing/MotionFeaturesGrid";
 import { WorkflowSteps } from "@/components/landing/WorkflowSteps";
 import { TestimonialsMarquee } from "@/components/landing/TestimonialsMarquee";
+import { LandingFaq } from "@/components/landing/LandingFaq";
 
 export default function LandingPage() {
   const { resolvedTheme, setTheme } = useTheme();
@@ -48,22 +53,29 @@ export default function LandingPage() {
           </span>
         </div>
 
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
-          <Link href="#scanner-demo" className="hover:text-foreground transition-colors">
-            ATS Scanner
+        <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-muted-foreground">
+          <Link href="#app-tour" className="hover:text-foreground transition-colors flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-primary" />
+            Product Tour
           </Link>
           <Link href="#how-it-works" className="hover:text-foreground transition-colors">
             How It Works
           </Link>
+          <Link href="#features" className="hover:text-foreground transition-colors">
+            Features
+          </Link>
           <Link href="#comparison" className="hover:text-foreground transition-colors">
             Before & After
+          </Link>
+          <Link href="#faq" className="hover:text-foreground transition-colors">
+            FAQ
           </Link>
         </nav>
 
         <div className="flex items-center gap-3">
           <button
             onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-            className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground border border-transparent hover:border-border"
+            className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground border border-transparent hover:border-border cursor-pointer"
             aria-label="Toggle dark mode"
           >
             {mounted && resolvedTheme === "dark" ? (
@@ -106,7 +118,7 @@ export default function LandingPage() {
             {/* Top Badge */}
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20 mb-6 shadow-xs backdrop-blur-sm">
               <Zap className="w-3.5 h-3.5 fill-primary" />
-              <span>Next-Gen ATS Parser Simulation • 98.4% Match Accuracy</span>
+              <span>Next-Gen Career Intelligence • ATS + Scam Shield + Commute Radar</span>
             </div>
 
             {/* Headline */}
@@ -119,8 +131,24 @@ export default function LandingPage() {
 
             {/* Subtitle */}
             <p className="text-base sm:text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
-              75% of qualified applicants are silently filtered out by Applicant Tracking Systems before a human ever reads them. We reveal missing keywords, fix formatting red flags, and optimize your resume in seconds.
+              75% of qualified applicants are filtered out before a human ever sees them. We reveal missing keywords, verify company legitimacy, audit commute feasibility, and export an ATS-perfect executive PDF in seconds.
             </p>
+
+            {/* Feature Highlights Pills */}
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-8 text-xs font-semibold">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Workday & Greenhouse Simulation
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                <ShieldCheck className="w-3.5 h-3.5" /> Company Scam Protection
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                <MapPin className="w-3.5 h-3.5" /> Commute & Relocation Radar
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 text-purple-500 border border-purple-500/20">
+                <Sparkles className="w-3.5 h-3.5" /> 1-Click Executive PDF
+              </span>
+            </div>
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
@@ -133,11 +161,11 @@ export default function LandingPage() {
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
-                href="#scanner-demo"
+                href="#app-tour"
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-card border border-border px-8 py-4 text-base font-semibold text-foreground hover:bg-muted transition-all shadow-xs"
               >
                 <FileText className="w-4 h-4 text-muted-foreground" />
-                <span>View Live Scanner Demo</span>
+                <span>Explore Live Product Tour</span>
               </Link>
             </div>
 
@@ -149,7 +177,7 @@ export default function LandingPage() {
               </span>
               <span className="flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-blue-500" />
-                100% Private & Encrypted
+                100% Private & In-Memory
               </span>
               <span className="flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-amber-500" />
@@ -170,6 +198,9 @@ export default function LandingPage() {
         {/* ── Auto-Scrolling Live Telemetry Ticker Ribbon ── */}
         <LiveTelemetryMarquee />
 
+        {/* ── Live Product Experience Showcase (Real Screenshots) ── */}
+        <AppExperienceShowcase />
+
         {/* ── How It Works Interactive Pipeline ── */}
         <WorkflowSteps />
 
@@ -183,6 +214,9 @@ export default function LandingPage() {
 
         {/* ── Infinite Testimonials & Success Stories Marquee ── */}
         <TestimonialsMarquee />
+
+        {/* ── Interactive FAQ Section ── */}
+        <LandingFaq />
 
         {/* ── Final High-Converting Animated CTA Section ── */}
         <section className="py-24 relative overflow-hidden bg-background">
@@ -233,11 +267,17 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-6 text-xs">
-            <Link href="#scanner-demo" className="hover:text-foreground transition-colors">
-              ATS Demo
+            <Link href="#app-tour" className="hover:text-foreground transition-colors">
+              Product Tour
             </Link>
             <Link href="#how-it-works" className="hover:text-foreground transition-colors">
-              Workflow
+              How It Works
+            </Link>
+            <Link href="#features" className="hover:text-foreground transition-colors">
+              Features
+            </Link>
+            <Link href="#faq" className="hover:text-foreground transition-colors">
+              FAQ
             </Link>
             <Link href="/dashboard" className="hover:text-foreground transition-colors">
               Dashboard
