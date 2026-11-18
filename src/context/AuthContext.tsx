@@ -23,10 +23,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
+    console.log("[AUTH_CONTEXT] Initializing AuthProvider listener...");
+
     // Use authStateReady to guarantee local IndexedDB persistence hydration has resolved
     if (typeof auth.authStateReady === "function") {
       auth.authStateReady().then(() => {
         if (isMounted) {
+          console.log("[AUTH_CONTEXT] authStateReady resolved. currentUser:", auth.currentUser?.email || "null");
           setUser(auth.currentUser);
           setLoading(false);
         }
@@ -37,12 +40,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       auth,
       (currentUser) => {
         if (isMounted) {
+          console.log("[AUTH_CONTEXT] onAuthStateChanged:", currentUser ? `Authenticated as ${currentUser.email} (${currentUser.uid})` : "Unauthenticated");
           setUser(currentUser);
           setLoading(false);
         }
       },
       (error) => {
-        console.error("Firebase auth state error:", error);
+        console.error("[AUTH_CONTEXT] Firebase auth state error:", error);
         if (isMounted) {
           setLoading(false);
         }
