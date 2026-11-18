@@ -22,6 +22,7 @@ export interface ResumeData {
     institution?: string;
     degree?: string;
     date?: string;
+    location?: string;
     gpa?: string;
     bullets?: string[];
   }>;
@@ -318,10 +319,11 @@ export const ResumeDocument = ({ data }: { data: ResumeData }) => {
               <View key={idx} style={styles.entryContainer}>
                 <View style={styles.entryHeaderRow}>
                   <Text style={styles.primaryTitle}>{edu.institution}</Text>
-                  <Text style={styles.dateLocation}>{edu.date}</Text>
+                  <Text style={styles.dateLocation}>{edu.location ? `${edu.location}` : edu.date}</Text>
                 </View>
                 <View style={styles.entryHeaderRow}>
                   <Text style={styles.subtitle}>{edu.degree} {edu.gpa ? `| GPA: ${edu.gpa}` : ''}</Text>
+                  {edu.location && <Text style={styles.dateLocation}>{edu.date}</Text>}
                 </View>
                 {edu.bullets && edu.bullets.map((b, i) => (
                   <View key={i} style={styles.bulletRow}>
