@@ -25,30 +25,35 @@ export async function POST(req: NextRequest) {
     }
 
     const prompt = `
-You are an expert Executive Resume Writer and Career Coach. 
-A user has provided a weak or draft bullet point for their resume. 
+You are a Principal Executive Resume Writer and Former Big-Tech Hiring Manager.
+A user has provided input for their resume bullet point (this could be a rough bullet, a fragmented sentence, or even a keyword/concept).
 
-Draft Bullet Point: "${draft}"
+User Input / Concept: "${draft}"
 ${role ? `Target Role/Industry: "${role}"` : ""}
 Requested Tone/Focus: "${tone || "Professional and Impact-Driven"}"
 
-Your task is to rewrite this bullet point into 3 highly polished, ATS-optimized variations.
-Each variation should start with a strong action verb and, where possible, imply or use placeholder metrics (like "by X%" or "saving $Y") to encourage the user to quantify their achievements.
+Your task is to generate 3 COMPLETE, production-ready, ATS-optimized bullet points.
+CRITICAL REQUIREMENTS:
+1. Every option MUST BE A FULL, COMPLETE BULLET POINT (never a short phrase, fragment, or single word).
+2. Follow the Google XYZ Formula: "Accomplished [X] as measured by [Y] by doing [Z]".
+3. Front-load with commanding, past-tense action verbs (e.g., Architected, Spearheaded, Overhauled, Orchestrated, Engineered).
+4. Include realistic, quantifiable impact metrics (e.g., "cutting query latency by 42%", "saving $45,000 annually", "processing 15M+ daily requests", "increasing conversion by 28%").
+5. Do NOT include bullet symbols like "•" or "-" at the start of the text.
 
 Provide a structured JSON response EXACTLY matching this format:
 {
   "options": [
     {
-      "text": "<The rewritten bullet point>",
-      "reasoning": "<A brief 1-sentence explanation of why this version is strong or what it highlights>"
+      "text": "<The complete, polished executive-grade bullet point>",
+      "reasoning": "<1-sentence breakdown of the metric and impact highlighted>"
     },
     {
-      "text": "<The rewritten bullet point>",
-      "reasoning": "<A brief 1-sentence explanation of why this version is strong or what it highlights>"
+      "text": "<The complete, polished executive-grade bullet point>",
+      "reasoning": "<1-sentence breakdown of the metric and impact highlighted>"
     },
     {
-      "text": "<The rewritten bullet point>",
-      "reasoning": "<A brief 1-sentence explanation of why this version is strong or what it highlights>"
+      "text": "<The complete, polished executive-grade bullet point>",
+      "reasoning": "<1-sentence breakdown of the metric and impact highlighted>"
     }
   ]
 }

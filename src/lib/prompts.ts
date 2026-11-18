@@ -33,7 +33,7 @@ ${metadata?.jobTitle ? `Target Job Title: "${metadata.jobTitle}"` : ""}
    - "weaknesses": 3 to 5 specific, evidence-backed bullet points.
    - "strengths": 3 to 5 distinct, evidence-based bullet points.
    - "keywordAnalysis": { "missing": ["skill1", ...], "density": 0-100 }.
-   - "suggestions": 3 to 5 bullet point improvements with exact verbatim "original", Google XYZ formula "improved", "reason", and "impact" ("High", "Critical", "Medium").
+   - "suggestions": 3 to 5 full bullet point improvements. CRITICAL: "original" MUST be the ENTIRE, COMPLETE existing bullet point verbatim from the candidate's resume (never a short phrase, fragment, or single word). "improved" MUST be a COMPLETE, full-sentence executive-grade bullet point rewrite using the Google XYZ formula ("Accomplished [X] as measured by [Y] by doing [Z]") starting with a commanding action verb and including tangible metrics/percentages.
    - "improvementImpact": Integer (10-25) estimated score gain if suggestions are accepted.
 
 2. LOCATION & COMMUTE INTELLIGENCE:
@@ -81,9 +81,9 @@ Return ONLY a valid JSON object matching this structure with NO markdown fences,
   "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
   "suggestions": [
     {
-      "original": "<exact verbatim substring from resume>",
-      "improved": "<XYZ formula rewrite>",
-      "reason": "<specific rationale>",
+      "original": "<The COMPLETE verbatim bullet point from the resume, not just a phrase or single word>",
+      "improved": "<COMPLETE full-sentence Google XYZ formula rewrite with strong action verbs and quantified metrics>",
+      "reason": "<specific rationale of what makes this full bullet superior>",
       "impact": "High"
     }
   ],
