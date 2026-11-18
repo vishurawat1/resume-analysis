@@ -2,9 +2,20 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
+const getAuthDomain = () => {
+  if (process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN) {
+    return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+  }
+  // When running in browser on Vercel, use same-origin authDomain to bypass Chrome third-party storage partitioning
+  if (typeof window !== "undefined" && window.location.hostname.endsWith("vercel.app")) {
+    return window.location.host;
+  }
+  return "resume-analysis-bd6d0.firebaseapp.com";
+};
+
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyAoqvK4y4j1Sv3DpRGA7qZsqbU6CczkekY",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "resume-analysis-bd6d0.firebaseapp.com",
+  authDomain: getAuthDomain(),
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "resume-analysis-bd6d0",
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "resume-analysis-bd6d0.firebasestorage.app",
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "545258110746",
