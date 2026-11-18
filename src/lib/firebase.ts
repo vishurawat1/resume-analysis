@@ -6,11 +6,11 @@ const getAuthDomain = () => {
   if (process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN) {
     return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
   }
-  // When running in browser on Vercel, use same-origin authDomain to bypass Chrome third-party storage partitioning
-  if (typeof window !== "undefined" && window.location.hostname.endsWith("vercel.app")) {
-    return window.location.host;
+  if (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+    return "resume-analysis-bd6d0.firebaseapp.com";
   }
-  return "resume-analysis-bd6d0.firebaseapp.com";
+  // Production Vercel domain - same origin prevents Chrome third-party storage partitioning
+  return "vr-resume-analysis.vercel.app";
 };
 
 const firebaseConfig = {
