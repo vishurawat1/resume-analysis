@@ -174,9 +174,9 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleAuth = async (useRedirect = false) => {
+  const handleGoogleAuth = (useRedirect = false) => {
     setError("");
-    setLoading(true);
+
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
 
@@ -192,11 +192,9 @@ export default function LoginPage() {
     console.log("Context:", debugContext);
 
     if (useRedirect) {
-      try {
-        console.log("Executing signInWithRedirect...");
-        await signInWithRedirect(auth, provider);
-        return;
-      } catch (redirectErr: unknown) {
+      setLoading(true);
+      console.log("Executing signInWithRedirect...");
+      signInWithRedirect(auth, provider).catch((redirectErr: unknown) => {
         const error = redirectErr as { code?: string; message?: string; stack?: string };
         console.error("❌ [GOOGLE REDIRECT ERROR]:", {
           code: error.code,
@@ -208,89 +206,79 @@ export default function LoginPage() {
         setDebugData({ ...debugContext, errorCode: error.code, errorMessage: error.message });
         setError(`[${error.code || "auth/error"}]: ${error.message || "Redirect failed."}`);
         setLoading(false);
-        return;
-      }
+      });
+      return;
     }
 
-    try {
-      console.log("Executing signInWithPopup...");
-      const userCredential = await signInWithPopup(auth, provider);
-      console.log("✅ [GOOGLE AUTH SUCCESS]:", {
-        uid: userCredential.user?.uid,
-        email: userCredential.user?.email,
-      });
-      console.groupEnd();
-      if (userCredential?.user) {
-        router.replace("/dashboard");
-        return;
-      }
-    } catch (err: unknown) {
-      // Check if user actually signed in despite any popup event
-      if (auth.currentUser) {
-        console.log("✅ [GOOGLE AUTH NOTE]: auth.currentUser exists despite error event.");
+    // ⚡ CRITICAL: Call signInWithPopup IMMEDIATELY and SYNCHRONOUSLY!
+    // Calling setState, await, or yielding to microtasks beforehand revokes transient
+    // user activation in Chrome and Safari, which causes "auth/popup-blocked".
+    console.log("Executing signInWithPopup synchronously in click gesture...");
+    const popupPromise = signInWithPopup(auth, provider);
+    setLoading(true);
+
+    popupPromise
+      .then((userCredential) => {
+        console.log("✅ [GOOGLE AUTH SUCCESS]:", {
+          uid: userCredential.user?.uid,
+          email: userCredential.user?.email,
+        });
         console.groupEnd();
-        router.replace("/dashboard");
-        return;
-      }
-
-      const error = err as { code?: string; message?: string; stack?: string; customData?: unknown };
-      console.error("❌ [GOOGLE POPUP ERROR DETAILS]:", {
-        code: error.code,
-        message: error.message,
-        customData: error.customData,
-        stack: error.stack,
-        fullError: err,
-      });
-      console.groupEnd();
-
-      const collectedDebug = {
-        ...debugContext,
-        errorCode: error.code || "UNKNOWN",
-        errorMessage: error.message || String(err),
-        customData: error.customData,
-      };
-      setDebugData(collectedDebug);
-
-      if (error.code === "auth/popup-blocked") {
-        console.log("⚠️ Popup blocked by browser! Auto-initiating signInWithRedirect fallback...");
-        try {
-          await signInWithRedirect(auth, provider);
-          return;
-        } catch (redirectErr: unknown) {
-          const rErr = redirectErr as { code?: string; message?: string };
-          console.error("❌ Fallback signInWithRedirect failed:", rErr);
-          setError("Your browser blocked the popup, and redirect failed. Please check browser permissions.");
-          setLoading(false);
+        if (userCredential?.user) {
+          router.replace("/dashboard");
         }
-      } else if (error.code === "auth/popup-closed-by-user") {
-        setTimeout(() => {
-          if (auth.currentUser) {
-            router.replace("/dashboard");
-          } else {
-            setError(
-              "Sign-in was cancelled or the popup was blocked by browser cross-origin policy. Try the 'Sign in with Google (Redirect Mode)' option below."
-            );
-            setLoading(false);
-          }
-        }, 500);
-      } else if (error.code === "auth/operation-not-allowed") {
-        setError(
-          "Google Sign-In is DISABLED in Firebase. Go to Firebase Console > Authentication > Sign-in method > Click Google > Enable it, choose a Support Email, and click Save."
-        );
+      })
+      .catch((err: unknown) => {
         setLoading(false);
-      } else if (error.code === "auth/unauthorized-domain") {
-        setError(
-          `Domain '${window.location.hostname}' is not authorized. Go to Firebase Console > Authentication > Settings > Authorized Domains, and add '${window.location.hostname}'.`
-        );
-        setLoading(false);
-      } else if (error.code === "auth/invalid-api-key" || error.code === "auth/api-key-not-valid") {
-        setError("Invalid Firebase API Key. Please verify your configuration.");
-        setLoading(false);
-      } else {
-        setError(error.message ? `[${error.code || "auth/error"}]: ${error.message}` : "Google authentication failed.");
-        setLoading(false);
-      }
-    }
+
+        // Check if user actually signed in despite any popup event
+        if (auth.currentUser) {
+          console.log("✅ [GOOGLE AUTH NOTE]: auth.currentUser exists despite error event.");
+          console.groupEnd();
+          router.replace("/dashboard");
+          return;
+        }
+
+        const error = err as { code?: string; message?: string; stack?: string; customData?: unknown };
+        console.error("❌ [GOOGLE POPUP ERROR DETAILS]:", {
+          code: error.code,
+          message: error.message,
+          customData: error.customData,
+          stack: error.stack,
+          fullError: err,
+        });
+        console.groupEnd();
+
+        const collectedDebug = {
+          ...debugContext,
+          errorCode: error.code || "UNKNOWN",
+          errorMessage: error.message || String(err),
+          customData: error.customData,
+        };
+        setDebugData(collectedDebug);
+
+        if (error.code === "auth/popup-blocked") {
+          setError(
+            "Your browser blocked the Google sign-in pop-up. Look for the pop-up icon in your browser's address bar (URL bar) and click 'Always allow pop-ups for this site', then try clicking 'Continue with Google' again."
+          );
+        } else if (error.code === "auth/popup-closed-by-user") {
+          setError(
+            "Sign-in was cancelled (the popup was closed before completing). Please try again."
+          );
+        } else if (error.code === "auth/operation-not-allowed") {
+          setError(
+            "Google Sign-In is DISABLED in Firebase. Go to Firebase Console > Authentication > Sign-in method > Click Google > Enable it, choose a Support Email, and click Save."
+          );
+        } else if (error.code === "auth/unauthorized-domain") {
+          setError(
+            `Domain '${window.location.hostname}' is not authorized. Go to Firebase Console > Authentication > Settings > Authorized Domains, and add '${window.location.hostname}'.`
+          );
+        } else if (error.code === "auth/invalid-api-key" || error.code === "auth/api-key-not-valid") {
+          setError("Invalid Firebase API Key. Please verify your configuration.");
+        } else {
+          setError(error.message ? `[${error.code || "auth/error"}]: ${error.message}` : "Google authentication failed.");
+        }
+      });
   };
 
   // If user is already authenticated or verifying redirect token, show seamless loading
