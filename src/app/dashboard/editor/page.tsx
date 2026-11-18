@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
 import Link from "next/link";
 import { 
   ChevronRight, 
@@ -47,7 +47,10 @@ import { pdf } from "@react-pdf/renderer";
 import { ResumeDocument, ResumeData } from "@/components/pdf/ResumeDocument";
 import { Suggestion } from "@/components/analysis/ImprovementSuggestionCard";
 
-// ── Auto-Resizing Textarea for Bullet Points (Prevents any clipping or overlap) ──
+// Safe layout effect for Next.js SSR hydration
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+// ── Auto-Resizing Textarea for Bullet Points, Summaries & Multi-line Text ──
 function AutoResizeTextarea({
   value,
   onChange,
@@ -61,11 +64,15 @@ function AutoResizeTextarea({
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
+  const resize = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.max(textareaRef.current.scrollHeight, 22)}px`;
+      textareaRef.current.style.height = `${Math.max(textareaRef.current.scrollHeight, 18)}px`;
     }
+  };
+
+  useIsomorphicLayoutEffect(() => {
+    resize();
   }, [value]);
 
   return (
@@ -73,42 +80,177 @@ function AutoResizeTextarea({
       ref={textareaRef}
       rows={1}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => {
+        onChange(e.target.value);
+        resize();
+      }}
+      onInput={resize}
       placeholder={placeholder}
-      className={className}
+      className={`overflow-hidden resize-none ${className || ""}`}
     />
   );
 }
 
-// ── Auto-Width Input for Header Contact Bar ──
+// ── Fluid Auto-Width Input for Header Contact Bar (Never clips digits or symbols) ──
 function AutoWidthInput({
   value,
   onChange,
   placeholder,
-  className,
+  className = "",
   isLink = false,
+  minWidth = 50,
 }: {
   value: string;
   onChange: (val: string) => void;
   placeholder: string;
   className?: string;
   isLink?: boolean;
+  minWidth?: number;
 }) {
   const displayVal = value || "";
-  const len = Math.max(displayVal.length || placeholder.length, 6);
-  const widthCh = `${Math.min(Math.max(len + 1, 8), 34)}ch`;
+  const spanRef = useRef<HTMLSpanElement>(null);
+  const [measuredWidth, setMeasuredWidth] = useState<number | undefined>(undefined);
+
+  useIsomorphicLayoutEffect(() => {
+    if (spanRef.current) {
+      const measured = Math.ceil(spanRef.current.getBoundingClientRect().width);
+      // Extra 16px buffer ensures characters (+, -, numbers, parentheses) never touch bounds or clip
+      setMeasuredWidth(Math.max(measured + 16, minWidth));
+    }
+  }, [displayVal, placeholder, minWidth]);
 
   return (
-    <input
-      type="text"
-      value={displayVal}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      style={{ width: widthCh }}
-      className={`text-center hover:bg-neutral-100 focus:bg-blue-50 focus:outline-none rounded px-1.5 py-0.5 transition-all ${
-        isLink ? "text-neutral-900 underline decoration-neutral-300" : "text-neutral-800"
-      } ${className || ""}`}
-    />
+    <div className="inline-flex items-center relative max-w-full">
+      <span
+        ref={spanRef}
+        aria-hidden="true"
+        className="invisible absolute left-0 top-0 whitespace-pre pointer-events-none text-[8.5pt] font-normal select-none px-1.5"
+      >
+        {displayVal || placeholder}
+      </span>
+      <input
+        type="text"
+        value={displayVal}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: measuredWidth ? `${measuredWidth}px` : "auto",
+          minWidth: `${minWidth}px`,
+          maxWidth: "100%",
+          fieldSizing: "content" as any,
+        }}
+        className={`text-center hover:bg-neutral-100 focus:bg-blue-50 focus:outline-none rounded px-1.5 py-0.5 transition-all ${
+          isLink ? "text-neutral-900 underline decoration-neutral-300" : "text-neutral-800"
+        } ${className}`}
+      />
+    </div>
+  );
+}
+
+// ── Fluid Right-Aligned Input for Dates & Locations (Expands fluidly, never locks or clips) ──
+function AutoRightInput({
+  value,
+  onChange,
+  placeholder,
+  className = "",
+  minWidth = 65,
+  maxWidth = "52%",
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder: string;
+  className?: string;
+  minWidth?: number;
+  maxWidth?: string;
+}) {
+  const displayVal = value || "";
+  const spanRef = useRef<HTMLSpanElement>(null);
+  const [measuredWidth, setMeasuredWidth] = useState<number | undefined>(undefined);
+
+  useIsomorphicLayoutEffect(() => {
+    if (spanRef.current) {
+      const measured = Math.ceil(spanRef.current.getBoundingClientRect().width);
+      setMeasuredWidth(Math.max(measured + 16, minWidth));
+    }
+  }, [displayVal, placeholder, minWidth]);
+
+  return (
+    <div 
+      className="inline-flex items-center justify-end relative shrink-0"
+      style={{ maxWidth }}
+    >
+      <span
+        ref={spanRef}
+        aria-hidden="true"
+        className={`invisible absolute right-0 top-0 whitespace-pre pointer-events-none select-none px-1 ${className}`}
+      >
+        {displayVal || placeholder}
+      </span>
+      <input
+        type="text"
+        value={displayVal}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: measuredWidth ? `${measuredWidth}px` : "auto",
+          minWidth: `${minWidth}px`,
+          maxWidth: "100%",
+          fieldSizing: "content" as any,
+        }}
+        className={`text-right hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 transition-all ${className}`}
+      />
+    </div>
+  );
+}
+
+// ── Fluid Auto-Width Input for Skills Category (Expands to exact text width) ──
+function AutoCategoryInput({
+  value,
+  onChange,
+  placeholder,
+  className = "",
+  minWidth = 55,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder: string;
+  className?: string;
+  minWidth?: number;
+}) {
+  const displayVal = value || "";
+  const spanRef = useRef<HTMLSpanElement>(null);
+  const [measuredWidth, setMeasuredWidth] = useState<number | undefined>(undefined);
+
+  useIsomorphicLayoutEffect(() => {
+    if (spanRef.current) {
+      const measured = Math.ceil(spanRef.current.getBoundingClientRect().width);
+      setMeasuredWidth(Math.max(measured + 14, minWidth));
+    }
+  }, [displayVal, placeholder, minWidth]);
+
+  return (
+    <div className="inline-flex items-baseline relative shrink-0">
+      <span
+        ref={spanRef}
+        aria-hidden="true"
+        className={`invisible absolute left-0 top-0 whitespace-pre pointer-events-none select-none px-1 ${className}`}
+      >
+        {displayVal || placeholder}
+      </span>
+      <input
+        type="text"
+        value={displayVal}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: measuredWidth ? `${measuredWidth}px` : "auto",
+          minWidth: `${minWidth}px`,
+          maxWidth: "320px",
+          fieldSizing: "content" as any,
+        }}
+        className={`hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 transition-all ${className}`}
+      />
+    </div>
   );
 }
 
@@ -977,26 +1119,25 @@ export default function ResumeEditorPage() {
               
               {/* ── 1. HEADER (Canva Editable Name & Contact Bar) ── */}
               <div className="text-center mb-4 pb-2 border-b border-neutral-100">
-                <input
-                  type="text"
+                <AutoResizeTextarea
                   value={resumeData.personalInfo?.name || ""}
-                  onChange={(e) => setResumeData(prev => ({
+                  onChange={(val) => setResumeData(prev => ({
                     ...prev,
-                    personalInfo: { ...prev.personalInfo, name: e.target.value }
+                    personalInfo: { ...prev.personalInfo, name: val }
                   }))}
                   placeholder="FIRST LAST"
-                  className="w-full text-center text-[22pt] font-bold tracking-normal text-neutral-900 uppercase hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-2 transition-colors leading-tight mb-2"
+                  className="w-full text-center text-[22pt] font-bold tracking-normal text-neutral-900 uppercase hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-2 transition-colors leading-tight mb-2 resize-none overflow-hidden"
                 />
 
-                {/* Single-line Dynamic Contact Bar */}
-                <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[8.5pt] text-neutral-800 font-normal">
+                {/* Single-line Dynamic Contact Bar (Never clips digits, symbols, or emails) */}
+                <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5 text-[8.5pt] text-neutral-800 font-normal">
                   <AutoWidthInput
                     value={resumeData.personalInfo?.phone || ""}
                     onChange={(val) => setResumeData(prev => ({
                       ...prev,
                       personalInfo: { ...prev.personalInfo, phone: val }
                     }))}
-                    placeholder="(123) 456-7890"
+                    placeholder="+91-7505579923"
                   />
                   <span className="text-neutral-400 select-none">|</span>
                   <AutoWidthInput
@@ -1166,16 +1307,15 @@ export default function ResumeEditorPage() {
                                 className="font-bold text-[9.5pt] text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
                               />
                               <div className="flex items-center gap-1 shrink-0 ml-2">
-                                <input
-                                  type="text"
+                                <AutoRightInput
                                   value={edu.location || ""}
-                                  onChange={(e) => {
+                                  onChange={(val) => {
                                     const newEdu = [...(resumeData.education || [])];
-                                    newEdu[eduIdx].location = e.target.value;
+                                    newEdu[eduIdx].location = val;
                                     setResumeData(prev => ({ ...prev, education: newEdu }));
                                   }}
                                   placeholder="City, State"
-                                  className="font-bold text-[9pt] text-right text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-28 shrink-0"
+                                  className="font-bold text-[9pt] text-neutral-900"
                                 />
                                 <button
                                   onClick={() => {
@@ -1203,16 +1343,15 @@ export default function ResumeEditorPage() {
                                 placeholder="Degree and Major; GPA"
                                 className="italic text-[9pt] text-neutral-800 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
                               />
-                              <input
-                                type="text"
+                              <AutoRightInput
                                 value={edu.date || ""}
-                                onChange={(e) => {
+                                onChange={(val) => {
                                   const newEdu = [...(resumeData.education || [])];
-                                  newEdu[eduIdx].date = e.target.value;
+                                  newEdu[eduIdx].date = val;
                                   setResumeData(prev => ({ ...prev, education: newEdu }));
                                 }}
                                 placeholder="Dates"
-                                className="italic text-[9pt] text-right text-neutral-700 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-32 shrink-0 ml-2"
+                                className="italic text-[9pt] text-neutral-700 ml-2"
                               />
                             </div>
                           </div>
@@ -1298,16 +1437,15 @@ export default function ResumeEditorPage() {
                                 className="font-bold text-[9.5pt] text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
                               />
                               <div className="flex items-center gap-1 shrink-0 ml-2">
-                                <input
-                                  type="text"
+                                <AutoRightInput
                                   value={exp.location || ""}
-                                  onChange={(e) => {
+                                  onChange={(val) => {
                                     const newExp = [...(resumeData.experience || [])];
-                                    newExp[expIdx].location = e.target.value;
+                                    newExp[expIdx].location = val;
                                     setResumeData(prev => ({ ...prev, experience: newExp }));
                                   }}
                                   placeholder="City, State"
-                                  className="font-bold text-[9pt] text-right text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-32 shrink-0"
+                                  className="font-bold text-[9pt] text-neutral-900"
                                 />
                                 <button
                                   onClick={() => {
@@ -1335,16 +1473,15 @@ export default function ResumeEditorPage() {
                                 placeholder="Role / Title"
                                 className="italic text-[9pt] text-neutral-800 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
                               />
-                              <input
-                                type="text"
+                              <AutoRightInput
                                 value={exp.date || ""}
-                                onChange={(e) => {
+                                onChange={(val) => {
                                   const newExp = [...(resumeData.experience || [])];
-                                  newExp[expIdx].date = e.target.value;
+                                  newExp[expIdx].date = val;
                                   setResumeData(prev => ({ ...prev, experience: newExp }));
                                 }}
                                 placeholder="Dates"
-                                className="italic text-[9pt] text-right text-neutral-700 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-32 shrink-0 ml-2"
+                                className="italic text-[9pt] text-neutral-700 ml-2"
                               />
                             </div>
 
@@ -1491,16 +1628,15 @@ export default function ResumeEditorPage() {
                                 className="font-bold text-[9.5pt] text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
                               />
                               <div className="flex items-center gap-1 shrink-0 ml-2">
-                                <input
-                                  type="text"
+                                <AutoRightInput
                                   value={proj.date || ""}
-                                  onChange={(e) => {
+                                  onChange={(val) => {
                                     const newProj = [...(resumeData.projects || [])];
-                                    newProj[pIdx].date = e.target.value;
+                                    newProj[pIdx].date = val;
                                     setResumeData(prev => ({ ...prev, projects: newProj }));
                                   }}
                                   placeholder="Date"
-                                  className="font-bold text-[9pt] text-right text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 w-24 shrink-0"
+                                  className="font-bold text-[9pt] text-neutral-900"
                                 />
                                 <button
                                   onClick={() => {
@@ -1515,18 +1651,17 @@ export default function ResumeEditorPage() {
                               </div>
                             </div>
 
-                            {/* Line 2: Technologies / Subtitle */}
+                            {/* Line 2: Technologies / Subtitle (Auto-wraps long tech stacks, never clips) */}
                             <div className="flex justify-between items-baseline text-[9pt] text-neutral-800 italic mb-0.5">
-                              <input
-                                type="text"
+                              <AutoResizeTextarea
                                 value={proj.description || ""}
-                                onChange={(e) => {
+                                onChange={(val) => {
                                   const newProj = [...(resumeData.projects || [])];
-                                  newProj[pIdx].description = e.target.value;
+                                  newProj[pIdx].description = val;
                                   setResumeData(prev => ({ ...prev, projects: newProj }));
                                 }}
                                 placeholder="Technologies (e.g. Next.js, TypeScript, PostgreSQL)"
-                                className="italic text-[9pt] text-neutral-800 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 min-w-0 flex-1"
+                                className="w-full bg-transparent hover:bg-neutral-50/80 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 italic text-[9pt] text-neutral-800 resize-none leading-snug overflow-hidden"
                               />
                             </div>
 
@@ -1643,36 +1778,33 @@ export default function ResumeEditorPage() {
 
                       <div className="space-y-1 text-[9pt] leading-[1.3]">
                         {(resumeData.skills || []).map((cat, catIdx) => (
-                          <div key={catIdx} className="flex items-baseline gap-1 group/skill relative">
-                            <input
-                              type="text"
+                          <div key={catIdx} className="flex items-start gap-1 group/skill relative">
+                            <AutoCategoryInput
                               value={cat.category ? `${cat.category}:` : ""}
-                              onChange={(e) => {
+                              onChange={(val) => {
                                 const newSkills = [...(resumeData.skills || [])];
-                                newSkills[catIdx].category = e.target.value.replace(/:$/, "");
+                                newSkills[catIdx].category = val.replace(/:$/, "");
                                 setResumeData(prev => ({ ...prev, skills: newSkills }));
                               }}
                               placeholder="Category:"
-                              style={{ width: `${Math.max((cat.category || "Category").length * 8 + 14, 110)}px` }}
-                              className="font-bold text-neutral-900 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 -ml-1 shrink-0"
+                              className="font-bold text-[9pt] text-neutral-900"
                             />
-                            <input
-                              type="text"
+                            <AutoResizeTextarea
                               value={(cat.items || []).join(", ")}
-                              onChange={(e) => {
+                              onChange={(val) => {
                                 const newSkills = [...(resumeData.skills || [])];
-                                newSkills[catIdx].items = e.target.value.split(",").map(s => s.trim()).filter(Boolean);
+                                newSkills[catIdx].items = val.split(",").map(s => s.trim()).filter(Boolean);
                                 setResumeData(prev => ({ ...prev, skills: newSkills }));
                               }}
                               placeholder="Comma-separated items (e.g. Python, TypeScript, Docker)"
-                              className="text-neutral-800 hover:bg-neutral-50 focus:bg-blue-50/50 focus:outline-none rounded px-1 min-w-0 flex-1 font-normal"
+                              className="w-full bg-transparent hover:bg-neutral-50/80 focus:bg-blue-50/50 focus:outline-none rounded px-1 text-neutral-800 font-normal text-[9pt] leading-[1.3] resize-none min-w-0 flex-1 overflow-hidden"
                             />
                             <button
                               onClick={() => {
                                 const newSkills = (resumeData.skills || []).filter((_, i) => i !== catIdx);
                                 setResumeData(prev => ({ ...prev, skills: newSkills }));
                               }}
-                              className="opacity-0 group-hover/skill:opacity-100 text-neutral-400 hover:text-rose-500 cursor-pointer p-0.5 shrink-0 print:hidden"
+                              className="opacity-0 group-hover/skill:opacity-100 text-neutral-400 hover:text-rose-500 cursor-pointer p-0.5 shrink-0 print:hidden mt-0.5"
                               title="Delete category"
                             >
                               <Trash2 className="w-3 h-3" />
