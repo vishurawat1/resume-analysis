@@ -20,6 +20,32 @@ interface RawAnalysisResult {
     density?: number;
   };
   improvementImpact?: number;
+  locationIntelligence?: {
+    candidateLocation?: string;
+    jobLocation?: string;
+    workModel?: string;
+    commuteFeasibility?: string;
+    distanceEstimate?: string;
+    verdict?: string;
+    relocationAdvice?: string;
+  };
+  companyIntelligence?: {
+    name?: string;
+    legitimacyStatus?: string;
+    legitimacyScore?: number;
+    industry?: string;
+    estimatedTier?: string;
+    overview?: string;
+    greenFlags?: string[];
+    redFlags?: string[];
+    verdict?: string;
+  };
+  seniorityFit?: {
+    candidateLevel?: string;
+    jobLevel?: string;
+    fitVerdict?: string;
+    estimatedSalaryRange?: string;
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -27,7 +53,7 @@ export async function POST(req: NextRequest) {
     const rateLimitResponse = applyRateLimit(req);
     if (rateLimitResponse) return rateLimitResponse;
 
-    const { resumeText, jobDescription } = await req.json();
+    const { resumeText, jobDescription, company, location, jobTitle } = await req.json();
 
     if (!resumeText || !jobDescription) {
       return NextResponse.json(
@@ -44,7 +70,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Payload exceeds maximum allowed length" }, { status: 400 });
     }
 
-    const prompt = getResumeAnalysisPrompt(resumeText, jobDescription);
+    const prompt = getResumeAnalysisPrompt(resumeText, jobDescription, {
+      company: typeof company === "string" ? company.trim() : undefined,
+      location: typeof location === "string" ? location.trim() : undefined,
+      jobTitle: typeof jobTitle === "string" ? jobTitle.trim() : undefined,
+    });
     const text = await generateAIResponse(prompt);
 
     let parsed: RawAnalysisResult;
@@ -109,6 +139,43 @@ export async function POST(req: NextRequest) {
       ? parsed.roleFitAnalysis.trim()
       : "The candidate shows relevant background for key aspects of the role, with notable opportunities to better highlight target technologies and quantified accomplishments.";
 
+    // Normalize Location & Commute Intelligence
+    const rawLoc = parsed.locationIntelligence;
+    const locationIntelligence = {
+      candidateLocation: rawLoc?.candidateLocation?.trim() || "Not specified on resume",
+      jobLocation: rawLoc?.jobLocation?.trim() || location || "As specified in job posting",
+      workModel: rawLoc?.workModel || "On-Site / Hybrid",
+      commuteFeasibility: rawLoc?.commuteFeasibility || "Manageable",
+      distanceEstimate: rawLoc?.distanceEstimate || "Local / Regional",
+      verdict: rawLoc?.verdict?.trim() || "Location appears standard for this type of position.",
+      relocationAdvice: rawLoc?.relocationAdvice?.trim() || "Confirm work arrangement (remote vs on-site) during initial interview.",
+    };
+
+    // Normalize Company Intelligence
+    const rawComp = parsed.companyIntelligence;
+    const companyIntelligence = {
+      name: rawComp?.name?.trim() || company || "Target Organization",
+      legitimacyStatus: rawComp?.legitimacyStatus || "Verified Enterprise",
+      legitimacyScore: Math.max(0, Math.min(100, Math.round(Number(rawComp?.legitimacyScore) || 85))),
+      industry: rawComp?.industry?.trim() || "Technology & Services",
+      estimatedTier: rawComp?.estimatedTier?.trim() || "Established Corporate / Scale-up",
+      overview: rawComp?.overview?.trim() || "Active employer hiring for this engineering and technical position.",
+      greenFlags: Array.isArray(rawComp?.greenFlags) && rawComp.greenFlags.length > 0
+        ? rawComp.greenFlags.map(String)
+        : ["Transparent job responsibilities", "Industry standard requirements"],
+      redFlags: Array.isArray(rawComp?.redFlags) ? rawComp.redFlags.map(String) : [],
+      verdict: rawComp?.verdict?.trim() || "Legitimate employer with standard hiring criteria.",
+    };
+
+    // Normalize Seniority Fit & Salary
+    const rawSen = parsed.seniorityFit;
+    const seniorityFit = {
+      candidateLevel: rawSen?.candidateLevel?.trim() || "Mid-Level Professional",
+      jobLevel: rawSen?.jobLevel?.trim() || "Mid-Senior Level",
+      fitVerdict: rawSen?.fitVerdict?.trim() || "Well Aligned",
+      estimatedSalaryRange: rawSen?.estimatedSalaryRange?.trim() || "Competitive / Market Standard",
+    };
+
     const sanitizedResult = {
       overallScore,
       roleFitAnalysis,
@@ -121,6 +188,9 @@ export async function POST(req: NextRequest) {
         density,
       },
       improvementImpact,
+      locationIntelligence,
+      companyIntelligence,
+      seniorityFit,
     };
 
     return NextResponse.json(sanitizedResult);

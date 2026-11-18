@@ -13,6 +13,9 @@ import { doc, setDoc } from "firebase/firestore";
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
+  const [company, setCompany] = useState("");
+  const [location, setLocation] = useState("");
   const [extractedText, setExtractedText] = useState("");
   const [isParsing, setIsParsing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -122,7 +125,9 @@ export default function UploadPage() {
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <input
                   type="text"
-                  placeholder="Job Title (e.g. Senior Product Designer)"
+                  value={jobTitle}
+                  onChange={(e) => setJobTitle(e.target.value)}
+                  placeholder="Job Title (e.g. Senior Software Engineer)"
                   className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                 />
               </div>
@@ -132,7 +137,9 @@ export default function UploadPage() {
                   <Building className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <input
                     type="text"
-                    placeholder="Company"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    placeholder="Company (e.g. Google, Stripe, or Startup)"
                     className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
@@ -140,7 +147,9 @@ export default function UploadPage() {
                   <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <input
                     type="text"
-                    placeholder="Location"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="Location (e.g. Remote, San Francisco, Space)"
                     className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
@@ -182,6 +191,9 @@ export default function UploadPage() {
                 text: extractedText,
                 fileName: file?.name || "resume.pdf",
                 jobDescription,
+                jobTitle,
+                company,
+                location,
                 updatedAt: new Date().toISOString()
               });
               
@@ -189,6 +201,9 @@ export default function UploadPage() {
               sessionStorage.setItem("resumeText", extractedText);
               sessionStorage.setItem("jobDescription", jobDescription);
               sessionStorage.setItem("fileName", file?.name || "resume.pdf");
+              sessionStorage.setItem("jobTitle", jobTitle);
+              sessionStorage.setItem("company", company);
+              sessionStorage.setItem("location", location);
               
               router.push("/dashboard/analysis");
             } catch (err) {

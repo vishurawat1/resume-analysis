@@ -24,11 +24,14 @@ export async function POST(req: NextRequest) {
     }
 
     const prompt = `
-You are an expert resume formatter.
-I will provide you with the raw, unformatted text of a resume.
-Your job is to parse this text and extract all information into a highly structured JSON object.
-Do NOT hallucinate or add any information that is not present in the text.
-Do NOT summarize or change the wording of the bullet points. Extract them exactly as written.
+You are a Principal Executive Resume Architect and Typesetter.
+Your job is to parse the raw resume text and extract all information into a pristine, high-fidelity structured JSON object for executive PDF rendering.
+
+Guidelines:
+1. Do NOT hallucinate skills or employers not present in the text.
+2. Clean every bullet point: strip any leading bullet markers ("•", "-", "*", "–"), ensure it starts with an active capitalized verb, and ends with a period.
+3. Group skills into clean, logical categories (e.g. "Languages", "Frameworks & Libraries", "Cloud & DevOps", "Tools & Databases").
+4. Format contact links cleanly: extract URL or handle for LinkedIn, GitHub, and Portfolio.
 
 The JSON MUST perfectly match this structure:
 {
@@ -36,50 +39,50 @@ The JSON MUST perfectly match this structure:
     "name": "Extract full name",
     "email": "Extract email or empty string",
     "phone": "Extract phone or empty string",
-    "location": "Extract location or empty string",
+    "location": "Extract city, state/country or empty string",
     "linkedin": "Extract linkedin URL or empty string",
     "github": "Extract github URL or empty string",
     "portfolio": "Extract portfolio URL or empty string"
   },
-  "summary": "Extract professional summary if it exists, otherwise empty string",
+  "summary": "Extract professional summary if present, otherwise empty string",
   "experience": [
     {
       "company": "Company Name",
       "role": "Job Title",
-      "date": "Date range (e.g. Jan 2020 - Present)",
+      "date": "Date range (e.g. Jan 2021 – Present)",
       "location": "Location if available",
-      "bullets": ["Exact bullet point 1", "Exact bullet point 2"]
+      "bullets": ["Clean polished bullet point without leading symbol", "..."]
     }
   ],
   "education": [
     {
       "institution": "University or School Name",
       "degree": "Degree and Major",
-      "date": "Graduation Date",
+      "date": "Graduation Date (e.g. May 2020)",
       "gpa": "GPA if available",
-      "bullets": ["Any bullet points under education"]
+      "bullets": ["Honors or notable achievements if any"]
     }
   ],
   "projects": [
     {
       "name": "Project Name",
-      "description": "Short description if available",
+      "description": "Tech stack or brief 1-line description",
       "link": "Project URL if available",
       "date": "Date if available",
-      "bullets": ["Exact bullet point 1", "Exact bullet point 2"]
+      "bullets": ["Clean accomplishment bullet point"]
     }
   ],
   "skills": [
     {
-      "category": "e.g., Languages, Frameworks, Tools",
-      "items": ["React", "TypeScript", "Node.js"]
+      "category": "Languages | Frameworks | Cloud & Tools",
+      "items": ["Skill 1", "Skill 2"]
     }
   ],
   "certifications": [
     {
       "name": "Certification Name",
       "issuer": "Issuing Organization",
-      "date": "Date"
+      "date": "Year / Date"
     }
   ]
 }

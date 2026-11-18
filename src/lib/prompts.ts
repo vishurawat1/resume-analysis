@@ -2,44 +2,68 @@
  * Enhanced Prompts for High-Precision ATS Resume Analysis and JD Matching.
  */
 
-export const getResumeAnalysisPrompt = (resumeText: string, jobDescription: string) => `
-You are an elite ATS (Applicant Tracking System) Algorithm Architect and Principal Technical Recruiter.
+/**
+ * Enhanced Prompts for High-Precision ATS Resume Analysis, Commute Intelligence, and Company Verification.
+ */
+
+export interface AnalysisMetadata {
+  company?: string;
+  location?: string;
+  jobTitle?: string;
+}
+
+export const getResumeAnalysisPrompt = (
+  resumeText: string,
+  jobDescription: string,
+  metadata?: AnalysisMetadata
+) => `
+You are an elite ATS (Applicant Tracking System) Algorithm Architect, Principal Technical Recruiter, and Senior Career Intelligence Strategist.
 Your objective is to perform an exceptionally rigorous, high-precision analysis of the provided RESUME against the target JOB DESCRIPTION (JD).
 
-### OBJECTIVE EVALUATION RUBRIC & SCORING METHODOLOGY
-Analyze and score the candidate with strict industry-grade objectivity according to these weighted criteria:
-1. Hard Skills & Tech Stack Match (40% weight): Compare every required and preferred technology, language, library, database, tool, and methodology in the JD against the resume. Deduct points for missing core competencies.
-2. Experience Level & Scope Alignment (25% weight): Compare the candidate's years of experience, seniority level (Junior/Mid/Senior/Lead), and depth of past roles against the JD's requirements.
-3. Measurable Impact & Quantification (15% weight): Check whether bullet points demonstrate quantified business/technical impact (e.g. percentages, scale, revenue, latency reductions, user growth) instead of passive job responsibilities.
-4. Keyword Optimization & Contextual Placement (10% weight): Assess presence and natural contextual integration of vital JD keywords across Summary, Experience, and Skills sections.
-5. ATS Parsability & Section Structure (10% weight): Check for standard section headings, clear chronology, absence of tables/columns that break parsers, and concise bullet points.
+${metadata?.company ? `Target Company: "${metadata.company}"` : ""}
+${metadata?.location ? `Target Job Location: "${metadata.location}"` : ""}
+${metadata?.jobTitle ? `Target Job Title: "${metadata.jobTitle}"` : ""}
 
-### SECTION SCORES BREAKDOWN (0 - 100 for each):
-- "Experience": Relevance to target role, seniority alignment, progression, and metrics-driven bullet points.
-- "Skills": Direct coverage of required technical stack, tools, frameworks, and methodologies.
-- "Education": Degree level, relevance of field, certifications, or equivalent industry experience matching JD.
-- "Projects": Hands-on application of target technologies, complexity, and demonstrable results.
-- "Formatting": ATS-friendliness, standard headers, readability, and structural cleanliness.
-- "KeywordOptimization": Ratio and natural density of JD-critical keywords present in the resume.
+### COMPREHENSIVE MULTI-DIMENSIONAL EVALUATION:
 
-### PRECISE CONSTRAINTS:
-- "overallScore": Integer (0-100), computed based on the weighted rubric above. Be honest, objective, and realistic (avoid artificial inflation).
-- "roleFitAnalysis": A substantive, authoritative 3-4 sentence paragraph that:
-    1. Highlights the candidate's strongest qualifications aligning with the JD.
-    2. Pinpoints the primary gap or missing qualification that recruiters will scrutinize.
-    3. Provides a concise, high-impact recommendation on how to position their background to pass human screening.
-- "sectionScores": Object with exact keys: "Experience", "Skills", "Education", "Projects", "Formatting", "KeywordOptimization". Each score an integer between 0 and 100.
-- "weaknesses": Exactly 3 to 5 distinct, highly actionable bullet points identifying specific gaps relative to the JD (e.g. missing tools, unquantified achievements, lack of specific domain experience).
-- "strengths": Exactly 3 to 5 distinct, evidence-based bullet points highlighting exact qualifications, technologies, or achievements from the resume that strongly match the JD.
-- "keywordAnalysis":
-    - "missing": Array of 4 to 8 HIGH-VALUE, specific technical skills, domain tools, certifications, or methodologies explicitly required by the JD that are truly absent from the resume. (Exclude generic words like "team", "communication", "collaborate", "fast-paced").
-    - "density": Integer (0-100) estimating the match percentage of core JD keywords found in the resume.
-- "suggestions": Exactly 3 to 5 bullet point improvements focusing on the weakest or least quantified bullets in the resume.
-    - "original": MUST BE AN EXACT, VERBATIM SUBSTRING copied directly from the RESUME TEXT. Do not alter any character, word, or punctuation, so that an automated text replacement will find and replace it.
-    - "improved": A polished, executive-grade rewrite applying the Google XYZ formula ("Accomplished [X] as measured by [Y], by doing [Z]"). Frontload with strong action verbs (e.g., Architected, Spearheaded, Engineered, Accelerated) and include realistic placeholder metrics (e.g., "by [X]%", "saving [$Y]", "reducing latency by [Z]ms") tailored to the JD.
-    - "reason": A 1-2 sentence explanation detailing what was fixed (e.g. added missing JD keyword, converted passive responsibility into quantified impact).
-    - "impact": One of "High", "Critical", or "Medium".
-- "improvementImpact": Integer (between 10 and 20) representing the estimated overall score gain if all suggestions are accepted.
+1. OBJECTIVE ATS SCORING & FIT (0-100):
+   - "overallScore": Integer (0-100) based on hard skills match (40%), experience scope (25%), measurable quantification (15%), keyword density (10%), and structure (10%).
+   - "roleFitAnalysis": 3-4 sentence authoritative assessment detailing qualifications match, primary gaps, and screening strategy.
+   - "sectionScores": Object with exact keys: "Experience", "Skills", "Education", "Projects", "Formatting", "KeywordOptimization" (each 0-100).
+   - "weaknesses": 3 to 5 specific, evidence-backed bullet points.
+   - "strengths": 3 to 5 distinct, evidence-based bullet points.
+   - "keywordAnalysis": { "missing": ["skill1", ...], "density": 0-100 }.
+   - "suggestions": 3 to 5 bullet point improvements with exact verbatim "original", Google XYZ formula "improved", "reason", and "impact" ("High", "Critical", "Medium").
+   - "improvementImpact": Integer (10-25) estimated score gain if suggestions are accepted.
+
+2. LOCATION & COMMUTE INTELLIGENCE:
+   - Extract candidate's location from the resume (e.g. City, Country, or "Not specified").
+   - Extract or use the target job location (from target metadata or JD).
+   - Detect "workModel": "Remote" | "Hybrid" | "On-Site" | "Flexible" | "Unknown".
+   - Evaluate "commuteFeasibility": "Local / Feasible" | "Manageable Commute" | "Relocation Required" | "Intercontinental / Remote Only" | "Out of this World / Unrealistic" | "Fully Remote".
+   - "distanceEstimate": E.g. "Local (< 25 km)", "~1,500 km (Domestic Relocation)", "~8,500 km (Intercontinental)", or "Interplanetary / 400,000+ km" if location is space/mars/fictional.
+   - "verdict": A candid, direct, and witty/smart assessment for the candidate:
+       * IF target location is "space", "Mars", "Moon", a fantasy location, or completely absurd: Humorously call it out! (E.g. "Bro, this job is literally in Outer Space! 🚀 Unless you have a SpaceX Starship on standby, this commute is out of this world! Check if remote work from Earth is permitted.")
+       * IF candidate is in a different city or country and the role is on-site: Tell them directly that it's far from their place and requires relocation or remote negotiation (e.g. "Bro, you're based in [Candidate City] and this job is in [Job City] (~[Distance]). That's way too far for a daily commute—unless they offer full visa/relocation sponsorship or remote flexibility, this requires moving.")
+       * IF role is remote or in candidate's home city: Confirm it's a great local or remote match.
+   - "relocationAdvice": Practical advice on commute feasibility, cost of living impact, or visa notes.
+
+3. COMPANY LEGITIMACY & INTELLIGENCE:
+   - Identify the company name from target metadata or the JD text.
+   - "legitimacyStatus": "Verified Enterprise" | "Established Tech Startup" | "Boutique / Early-Stage" | "Unverified / Caution" | "High Risk / Suspicious".
+   - "legitimacyScore": Integer (0-100) reflecting credibility and job legitimacy.
+   - "industry": Industry vertical (e.g., "Enterprise Cloud & AI", "Fintech / Payments", "E-commerce", "Consulting", "Unknown").
+   - "estimatedTier": "Fortune 500 / Big Tech" | "Unicorn / High-Growth" | "Early Stage Startup" | "Agency / Consultancy" | "Unknown / Phantom".
+   - "overview": 1-2 sentence summary of what the company does and its market standing.
+   - "greenFlags": Array of 2 to 4 positive credibility indicators from the JD (e.g. "Transparent salary range provided", "Established technology stack", "Clear reporting hierarchy", "Legitimate corporate email and domain").
+   - "redFlags": Array of any suspicious indicators (e.g. "Vague role responsibilities", "Requests upfront money/equipment purchase", "Unrealistic earning claims", "Generic free-mail recruiter contact", or empty array if company is fully legit).
+   - "verdict": Plain-English verdict on whether the company is legitimate, safe, and reputable to apply to.
+
+4. SENIORITY & SALARY MARKET INSIGHTS:
+   - "candidateLevel": "Junior (0-2 yrs)" | "Mid-Level (3-5 yrs)" | "Senior (5-8 yrs)" | "Staff / Lead (8+ yrs)"
+   - "jobLevel": "Entry Level" | "Mid-Level" | "Senior" | "Lead / Staff" | "Director / Executive"
+   - "fitVerdict": "Perfect Seniority Match" | "Stretch / Ambitious Role" | "Overqualified"
+   - "estimatedSalaryRange": Typical market compensation for this title/location (e.g., "$120,000 - $155,000 / year" or "₹16L - ₹24L / year" or "Competitive / Based on Experience").
 
 Return ONLY a valid JSON object matching this structure with NO markdown fences, no conversational text:
 {
@@ -67,7 +91,33 @@ Return ONLY a valid JSON object matching this structure with NO markdown fences,
     "missing": ["<missing skill 1>", "<missing skill 2>"],
     "density": <integer 0-100>
   },
-  "improvementImpact": <integer 10-20>
+  "improvementImpact": <integer 10-25>,
+  "locationIntelligence": {
+    "candidateLocation": "<extracted or detected location>",
+    "jobLocation": "<target job location>",
+    "workModel": "Remote" | "Hybrid" | "On-Site" | "Flexible" | "Unknown",
+    "commuteFeasibility": "Local / Feasible" | "Manageable Commute" | "Relocation Required" | "Intercontinental / Remote Only" | "Out of this World / Unrealistic" | "Fully Remote",
+    "distanceEstimate": "<distance estimate>",
+    "verdict": "<witty and informative verdict>",
+    "relocationAdvice": "<relocation/visa advice>"
+  },
+  "companyIntelligence": {
+    "name": "<company name>",
+    "legitimacyStatus": "Verified Enterprise" | "Established Tech Startup" | "Boutique / Early-Stage" | "Unverified / Caution" | "High Risk / Suspicious",
+    "legitimacyScore": <integer 0-100>,
+    "industry": "<industry>",
+    "estimatedTier": "<tier>",
+    "overview": "<1-2 sentence overview>",
+    "greenFlags": ["<flag 1>", "<flag 2>"],
+    "redFlags": ["<flag 1>"],
+    "verdict": "<company legitimacy verdict>"
+  },
+  "seniorityFit": {
+    "candidateLevel": "<candidate level>",
+    "jobLevel": "<job level>",
+    "fitVerdict": "<fit verdict>",
+    "estimatedSalaryRange": "<salary range>"
+  }
 }
 
 --- TARGET JOB DESCRIPTION ---

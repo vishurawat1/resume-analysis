@@ -1,13 +1,4 @@
-import { Document, Page, Text, View, StyleSheet, Font, Link } from '@react-pdf/renderer';
-
-// Register fonts (Using standard serif for ATS Harvard style)
-Font.register({
-  family: 'Times-Roman',
-  fonts: [
-    { src: 'https://cdn.jsdelivr.net/npm/@canvas-fonts/times-new-roman@1.0.4/Times%20New%20Roman.ttf' },
-    { src: 'https://cdn.jsdelivr.net/npm/@canvas-fonts/times-new-roman@1.0.4/Times%20New%20Roman%20Bold.ttf', fontWeight: 'bold' }
-  ]
-});
+import { Document, Page, Text, View, StyleSheet, Link } from '@react-pdf/renderer';
 
 export interface ResumeData {
   personalInfo?: {
@@ -45,105 +36,207 @@ export interface ResumeData {
     category?: string;
     items?: string[];
   }>;
+  certifications?: Array<{
+    name?: string;
+    issuer?: string;
+    date?: string;
+  }>;
 }
 
 const styles = StyleSheet.create({
   page: {
-    padding: '36pt', // 0.5 inch margins
-    fontFamily: 'Times-Roman',
-    fontSize: 11,
-    lineHeight: 1.2,
-    color: '#000000',
+    paddingTop: 32,
+    paddingBottom: 32,
+    paddingHorizontal: 36, // ~0.5 inch margins
+    fontFamily: 'Helvetica',
+    fontSize: 9.5,
+    lineHeight: 1.35,
+    color: '#1e293b',
   },
-  // Personal Info
+  // Header / Personal Info
+  headerContainer: {
+    marginBottom: 10,
+    alignItems: 'center',
+  },
   name: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontSize: 20,
+    fontFamily: 'Helvetica-Bold',
+    color: '#0f172a',
+    letterSpacing: 0.5,
     marginBottom: 4,
+    textTransform: 'uppercase',
   },
   contactRow: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
     flexWrap: 'wrap',
-    marginBottom: 12,
-    fontSize: 10,
+    fontSize: 8.5,
+    color: '#475569',
   },
   contactItem: {
-    marginHorizontal: 4,
+    marginHorizontal: 3,
   },
+  contactLink: {
+    color: '#2563eb',
+    textDecoration: 'none',
+  },
+  dividerDot: {
+    color: '#94a3b8',
+    marginHorizontal: 3,
+  },
+
   // Section Headers
   sectionHeader: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 10,
+    fontFamily: 'Helvetica-Bold',
+    color: '#0f172a',
     textTransform: 'uppercase',
+    letterSpacing: 0.8,
     borderBottomWidth: 1,
-    borderBottomColor: '#000000',
+    borderBottomColor: '#2563eb',
     paddingBottom: 2,
-    marginBottom: 6,
     marginTop: 8,
+    marginBottom: 5,
   },
+
   // Summary
   summary: {
-    marginBottom: 8,
-    textAlign: 'justify',
+    fontSize: 9,
+    lineHeight: 1.4,
+    color: '#334155',
+    marginBottom: 4,
   },
-  // Experience / Education Block
-  entryHeader: {
+
+  // Experience / Projects / Education Entries
+  entryContainer: {
+    marginBottom: 6,
+  },
+  entryHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    marginBottom: 2,
+    marginBottom: 1.5,
   },
-  companyName: {
-    fontWeight: 'bold',
-    fontSize: 11,
+  primaryTitle: {
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 10,
+    color: '#0f172a',
+  },
+  secondaryTitle: {
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 9.5,
+    color: '#1e293b',
+  },
+  subtitle: {
+    fontFamily: 'Helvetica-Oblique',
+    fontSize: 9,
+    color: '#334155',
   },
   dateLocation: {
-    fontSize: 11,
+    fontSize: 8.5,
+    color: '#64748b',
+    textAlign: 'right',
   },
-  jobTitle: {
-    fontStyle: 'italic',
-    marginBottom: 4,
-  },
-  // Bullets
-  bulletContainer: {
+
+  // Bullet Points
+  bulletRow: {
     flexDirection: 'row',
-    marginBottom: 3,
-    paddingLeft: 8,
+    marginBottom: 2,
+    paddingLeft: 4,
   },
   bulletPoint: {
-    width: 12,
+    width: 10,
+    fontSize: 8.5,
+    color: '#2563eb',
   },
-  bulletText: {
+  bulletContent: {
     flex: 1,
-    textAlign: 'justify',
+    fontSize: 9,
+    lineHeight: 1.35,
+    color: '#334155',
   },
+
   // Skills
-  skillCategory: {
-    fontWeight: 'bold',
+  skillsContainer: {
+    marginTop: 2,
   },
   skillRow: {
     flexDirection: 'row',
-    marginBottom: 3,
-  }
+    marginBottom: 2.5,
+    fontSize: 9,
+  },
+  skillCategory: {
+    fontFamily: 'Helvetica-Bold',
+    color: '#0f172a',
+    marginRight: 4,
+  },
+  skillItems: {
+    flex: 1,
+    color: '#334155',
+  },
 });
+
+const cleanDisplayUrl = (url?: string) => {
+  if (!url) return '';
+  return url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+};
+
+const formatBullet = (bullet: string) => {
+  return bullet.replace(/^[-•*–—]\s*/, '').trim();
+};
 
 export const ResumeDocument = ({ data }: { data: ResumeData }) => {
   return (
     <Document>
       <Page size="LETTER" style={styles.page}>
         
-        {/* Personal Info */}
+        {/* Personal Info Header */}
         {data.personalInfo && (
-          <View>
+          <View style={styles.headerContainer}>
             {data.personalInfo.name && <Text style={styles.name}>{data.personalInfo.name}</Text>}
             <View style={styles.contactRow}>
-              {data.personalInfo.location && <Text style={styles.contactItem}>{data.personalInfo.location}</Text>}
-              {data.personalInfo.phone && <Text style={styles.contactItem}>| {data.personalInfo.phone}</Text>}
-              {data.personalInfo.email && <Text style={styles.contactItem}>| {data.personalInfo.email}</Text>}
-              {data.personalInfo.linkedin && <Text style={styles.contactItem}>| {data.personalInfo.linkedin}</Text>}
-              {data.personalInfo.github && <Text style={styles.contactItem}>| {data.personalInfo.github}</Text>}
+              {data.personalInfo.location && (
+                <Text style={styles.contactItem}>{data.personalInfo.location}</Text>
+              )}
+              {data.personalInfo.phone && (
+                <>
+                  <Text style={styles.dividerDot}>•</Text>
+                  <Text style={styles.contactItem}>{data.personalInfo.phone}</Text>
+                </>
+              )}
+              {data.personalInfo.email && (
+                <>
+                  <Text style={styles.dividerDot}>•</Text>
+                  <Link src={`mailto:${data.personalInfo.email}`} style={[styles.contactItem, styles.contactLink]}>
+                    {data.personalInfo.email}
+                  </Link>
+                </>
+              )}
+              {data.personalInfo.linkedin && (
+                <>
+                  <Text style={styles.dividerDot}>•</Text>
+                  <Link src={data.personalInfo.linkedin.startsWith('http') ? data.personalInfo.linkedin : `https://${data.personalInfo.linkedin}`} style={[styles.contactItem, styles.contactLink]}>
+                    {cleanDisplayUrl(data.personalInfo.linkedin)}
+                  </Link>
+                </>
+              )}
+              {data.personalInfo.github && (
+                <>
+                  <Text style={styles.dividerDot}>•</Text>
+                  <Link src={data.personalInfo.github.startsWith('http') ? data.personalInfo.github : `https://${data.personalInfo.github}`} style={[styles.contactItem, styles.contactLink]}>
+                    {cleanDisplayUrl(data.personalInfo.github)}
+                  </Link>
+                </>
+              )}
+              {data.personalInfo.portfolio && (
+                <>
+                  <Text style={styles.dividerDot}>•</Text>
+                  <Link src={data.personalInfo.portfolio.startsWith('http') ? data.personalInfo.portfolio : `https://${data.personalInfo.portfolio}`} style={[styles.contactItem, styles.contactLink]}>
+                    {cleanDisplayUrl(data.personalInfo.portfolio)}
+                  </Link>
+                </>
+              )}
             </View>
           </View>
         )}
@@ -156,21 +249,38 @@ export const ResumeDocument = ({ data }: { data: ResumeData }) => {
           </View>
         )}
 
-        {/* Experience */}
+        {/* Technical Skills */}
+        {data.skills && data.skills.length > 0 && (
+          <View style={{ marginBottom: 4 }}>
+            <Text style={styles.sectionHeader}>Technical Skills</Text>
+            <View style={styles.skillsContainer}>
+              {data.skills.map((skill, idx) => (
+                <View key={idx} style={styles.skillRow}>
+                  <Text style={styles.skillCategory}>{skill.category}:</Text>
+                  <Text style={styles.skillItems}>{skill.items?.join(', ')}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Work Experience */}
         {data.experience && data.experience.length > 0 && (
           <View>
-            <Text style={styles.sectionHeader}>Experience</Text>
+            <Text style={styles.sectionHeader}>Work Experience</Text>
             {data.experience.map((exp, idx) => (
-              <View key={idx} style={{ marginBottom: 6 }}>
-                <View style={styles.entryHeader}>
-                  <Text style={styles.companyName}>{exp.company}</Text>
-                  <Text style={styles.dateLocation}>{exp.date} {exp.location ? `| ${exp.location}` : ''}</Text>
+              <View key={idx} style={styles.entryContainer}>
+                <View style={styles.entryHeaderRow}>
+                  <Text style={styles.primaryTitle}>{exp.role || exp.company}</Text>
+                  <Text style={styles.dateLocation}>{exp.date}</Text>
                 </View>
-                {exp.role && <Text style={styles.jobTitle}>{exp.role}</Text>}
+                <View style={styles.entryHeaderRow}>
+                  <Text style={styles.subtitle}>{exp.company} {exp.location ? `| ${exp.location}` : ''}</Text>
+                </View>
                 {exp.bullets && exp.bullets.map((b, i) => (
-                  <View key={i} style={styles.bulletContainer}>
+                  <View key={i} style={styles.bulletRow}>
                     <Text style={styles.bulletPoint}>•</Text>
-                    <Text style={styles.bulletText}>{b.replace(/^[-•]\\s*/, '')}</Text>
+                    <Text style={styles.bulletContent}>{formatBullet(b)}</Text>
                   </View>
                 ))}
               </View>
@@ -178,21 +288,21 @@ export const ResumeDocument = ({ data }: { data: ResumeData }) => {
           </View>
         )}
 
-        {/* Projects */}
+        {/* Key Projects */}
         {data.projects && data.projects.length > 0 && (
           <View>
-            <Text style={styles.sectionHeader}>Projects</Text>
+            <Text style={styles.sectionHeader}>Key Projects</Text>
             {data.projects.map((proj, idx) => (
-              <View key={idx} style={{ marginBottom: 6 }}>
-                <View style={styles.entryHeader}>
-                  <Text style={styles.companyName}>{proj.name}</Text>
+              <View key={idx} style={styles.entryContainer}>
+                <View style={styles.entryHeaderRow}>
+                  <Text style={styles.secondaryTitle}>{proj.name}</Text>
                   <Text style={styles.dateLocation}>{proj.date}</Text>
                 </View>
-                {proj.description && <Text style={styles.jobTitle}>{proj.description}</Text>}
+                {proj.description && <Text style={styles.subtitle}>{proj.description}</Text>}
                 {proj.bullets && proj.bullets.map((b, i) => (
-                  <View key={i} style={styles.bulletContainer}>
+                  <View key={i} style={styles.bulletRow}>
                     <Text style={styles.bulletPoint}>•</Text>
-                    <Text style={styles.bulletText}>{b.replace(/^[-•]\\s*/, '')}</Text>
+                    <Text style={styles.bulletContent}>{formatBullet(b)}</Text>
                   </View>
                 ))}
               </View>
@@ -205,19 +315,18 @@ export const ResumeDocument = ({ data }: { data: ResumeData }) => {
           <View>
             <Text style={styles.sectionHeader}>Education</Text>
             {data.education.map((edu, idx) => (
-              <View key={idx} style={{ marginBottom: 6 }}>
-                <View style={styles.entryHeader}>
-                  <Text style={styles.companyName}>{edu.institution}</Text>
+              <View key={idx} style={styles.entryContainer}>
+                <View style={styles.entryHeaderRow}>
+                  <Text style={styles.primaryTitle}>{edu.institution}</Text>
                   <Text style={styles.dateLocation}>{edu.date}</Text>
                 </View>
-                <View style={styles.entryHeader}>
-                  <Text style={styles.jobTitle}>{edu.degree}</Text>
-                  {edu.gpa && <Text style={styles.dateLocation}>GPA: {edu.gpa}</Text>}
+                <View style={styles.entryHeaderRow}>
+                  <Text style={styles.subtitle}>{edu.degree} {edu.gpa ? `| GPA: ${edu.gpa}` : ''}</Text>
                 </View>
                 {edu.bullets && edu.bullets.map((b, i) => (
-                  <View key={i} style={styles.bulletContainer}>
+                  <View key={i} style={styles.bulletRow}>
                     <Text style={styles.bulletPoint}>•</Text>
-                    <Text style={styles.bulletText}>{b.replace(/^[-•]\\s*/, '')}</Text>
+                    <Text style={styles.bulletContent}>{formatBullet(b)}</Text>
                   </View>
                 ))}
               </View>
@@ -225,14 +334,14 @@ export const ResumeDocument = ({ data }: { data: ResumeData }) => {
           </View>
         )}
 
-        {/* Skills */}
-        {data.skills && data.skills.length > 0 && (
+        {/* Certifications & Credentials */}
+        {data.certifications && data.certifications.length > 0 && (
           <View>
-            <Text style={styles.sectionHeader}>Technical Skills</Text>
-            {data.skills.map((skill, idx) => (
-              <View key={idx} style={styles.skillRow}>
-                <Text style={styles.skillCategory}>{skill.category}: </Text>
-                <Text>{skill.items?.join(', ')}</Text>
+            <Text style={styles.sectionHeader}>Certifications</Text>
+            {data.certifications.map((cert, idx) => (
+              <View key={idx} style={styles.entryHeaderRow}>
+                <Text style={styles.secondaryTitle}>{cert.name} {cert.issuer ? `– ${cert.issuer}` : ''}</Text>
+                {cert.date && <Text style={styles.dateLocation}>{cert.date}</Text>}
               </View>
             ))}
           </View>

@@ -8,6 +8,9 @@ import { ResumeRadarChart } from "@/components/analytics/ResumeRadarChart";
 import { SectionAnalysisCard } from "@/components/analytics/SectionAnalysisCard";
 import { ResumeWeaknessCard } from "@/components/analysis/ResumeWeaknessCard";
 import { ImprovementSuggestionCard, Suggestion } from "@/components/analysis/ImprovementSuggestionCard";
+import { LocationIntelligenceCard, LocationIntelligence } from "@/components/analysis/LocationIntelligenceCard";
+import { CompanyIntelligenceCard, CompanyIntelligence } from "@/components/analysis/CompanyIntelligenceCard";
+import { SeniorityMarketCard, SeniorityFit } from "@/components/analysis/SeniorityMarketCard";
 import { DownloadResumeButton } from "@/components/pdf/DownloadResumeButton";
 import { SaveAnalysisButton } from "@/components/analysis/SaveAnalysisButton";
 import { ChevronRight, FileText, Loader2, AlertCircle, Sparkles, Target, TrendingUp } from "lucide-react";
@@ -29,6 +32,9 @@ interface DeepAIResult {
     density: number;
   };
   improvementImpact: number;
+  locationIntelligence?: LocationIntelligence;
+  companyIntelligence?: CompanyIntelligence;
+  seniorityFit?: SeniorityFit;
 }
 
 export default function AnalysisPage() {
@@ -51,6 +57,9 @@ export default function AnalysisPage() {
       let resumeText = sessionStorage.getItem("resumeText");
       let jobDescription = sessionStorage.getItem("jobDescription");
       let fName = sessionStorage.getItem("fileName");
+      let jobTitle = sessionStorage.getItem("jobTitle") || "";
+      let company = sessionStorage.getItem("company") || "";
+      let location = sessionStorage.getItem("location") || "";
 
       // Fallback to Firestore if we have a logged-in user and session is empty
       if ((!resumeText || !jobDescription) && user) {
@@ -62,11 +71,17 @@ export default function AnalysisPage() {
             resumeText = data.text;
             jobDescription = data.jobDescription;
             fName = data.fileName;
+            jobTitle = data.jobTitle || "";
+            company = data.company || "";
+            location = data.location || "";
             
             // Re-hydrate session storage
             if (resumeText) sessionStorage.setItem("resumeText", resumeText);
             if (jobDescription) sessionStorage.setItem("jobDescription", jobDescription);
             if (fName) sessionStorage.setItem("fileName", fName);
+            if (jobTitle) sessionStorage.setItem("jobTitle", jobTitle);
+            if (company) sessionStorage.setItem("company", company);
+            if (location) sessionStorage.setItem("location", location);
           }
         } catch (err) {
           console.error("Failed to fetch resume from Firestore:", err);
@@ -88,7 +103,7 @@ export default function AnalysisPage() {
       fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resumeText, jobDescription }),
+        body: JSON.stringify({ resumeText, jobDescription, jobTitle, company, location }),
       })
         .then((res) => res.json())
         .then((data) => {
@@ -228,9 +243,25 @@ export default function AnalysisPage() {
             </motion.div>
           </div>
 
-          {/* Role Fit & Keywords */}
-          <div className="grid md:grid-cols-3 gap-6">
-            <motion.div variants={itemVariants} className="md:col-span-2 bg-card border border-border rounded-xl p-6 shadow-sm space-y-4">
+          {/* Company Legitimacy & Location Radar */}
+          {(aiResult.companyIntelligence || aiResult.locationIntelligence) && (
+            <div className="grid lg:grid-cols-2 gap-6">
+              {aiResult.companyIntelligence && (
+                <motion.div variants={itemVariants}>
+                  <CompanyIntelligenceCard data={aiResult.companyIntelligence} />
+                </motion.div>
+              )}
+              {aiResult.locationIntelligence && (
+                <motion.div variants={itemVariants}>
+                  <LocationIntelligenceCard data={aiResult.locationIntelligence} />
+                </motion.div>
+              )}
+            </div>
+          )}
+
+          {/* Role Fit, Seniority & Keywords */}
+          <div className="grid lg:grid-cols-3 gap-6">
+            <motion.div variants={itemVariants} className={`${aiResult.seniorityFit ? "lg:col-span-2" : "lg:col-span-2"} bg-card border border-border rounded-xl p-6 shadow-sm space-y-4`}>
               <div className="flex items-center gap-2 text-primary mb-2">
                 <Sparkles className="w-5 h-5" />
                 <h2 className="text-xl font-semibold text-foreground">Role Fit Analysis</h2>
@@ -240,25 +271,60 @@ export default function AnalysisPage() {
               </p>
             </motion.div>
 
-            <motion.div variants={itemVariants} className="bg-card border border-border rounded-xl p-6 shadow-sm space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">Keyword Gap</h2>
+            {aiResult.seniorityFit ? (
+              <motion.div variants={itemVariants}>
+                <SeniorityMarketCard data={aiResult.seniorityFit} />
+              </motion.div>
+            ) : (
+              <motion.div variants={itemVariants} className="bg-card border border-border rounded-xl p-6 shadow-sm space-y-4">
+                <h2 className="text-lg font-semibold text-foreground">Keyword Gap</h2>
+                <div className="flex flex-wrap gap-2">
+                  {aiResult.keywordAnalysis.missing.length > 0 ? (
+                    aiResult.keywordAnalysis.missing.map((kw, i) => (
+                      <span key={i} className="px-3 py-1 bg-destructive/10 text-destructive text-xs font-semibold rounded-md border border-destructive/20">
+                        {kw}
+                      </span>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No critical keywords missing.</p>
+                  )}
+                </div>
+                <div className="mt-4 pt-4 border-t border-border flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Keyword Density</span>
+                  <span className="font-semibold">{aiResult.keywordAnalysis.density}%</span>
+                </div>
+              </motion.div>
+            )}
+          </div>
+
+          {/* Keyword Gap standalone if SeniorityCard is shown */}
+          {aiResult.seniorityFit && (
+            <motion.div variants={itemVariants} className="bg-card border border-border rounded-xl p-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground">Keyword Optimization & Coverage</h2>
+                  <p className="text-xs text-muted-foreground">Critical target skills and ATS keyword saturation</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Keyword Match:</span>
+                  <span className="px-2.5 py-1 bg-primary/10 text-primary font-bold text-xs rounded-full border border-primary/20">
+                    {aiResult.keywordAnalysis.density}%
+                  </span>
+                </div>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {aiResult.keywordAnalysis.missing.length > 0 ? (
                   aiResult.keywordAnalysis.missing.map((kw, i) => (
                     <span key={i} className="px-3 py-1 bg-destructive/10 text-destructive text-xs font-semibold rounded-md border border-destructive/20">
-                      {kw}
+                      + Missing: {kw}
                     </span>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">No critical keywords missing.</p>
+                  <p className="text-sm text-muted-foreground">Excellent! No critical tech stack keywords are missing from your resume.</p>
                 )}
               </div>
-              <div className="mt-4 pt-4 border-t border-border flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Keyword Density</span>
-                <span className="font-semibold">{aiResult.keywordAnalysis.density}%</span>
-              </div>
             </motion.div>
-          </div>
+          )}
 
           {/* Weaknesses and Strengths */}
           <motion.div variants={itemVariants}>
