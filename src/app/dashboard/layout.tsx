@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Navbar } from "@/components/layout/Navbar";
 import { useAuth } from "@/context/AuthContext";
 import { auth } from "@/lib/firebase";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 export default function DashboardLayout({
@@ -16,6 +16,8 @@ export default function DashboardLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const isFullBleedEditor = pathname === "/dashboard/editor";
 
   useEffect(() => {
     if (!loading && !user && !auth.currentUser) {
@@ -60,8 +62,14 @@ export default function DashboardLayout({
       />
       <div className="flex-1 flex flex-col min-w-0">
         <Navbar onMenuClick={() => setIsSidebarOpen(true)} />
-        <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
-          <div className="mx-auto max-w-6xl">
+        <main
+          className={
+            isFullBleedEditor
+              ? "flex-1 p-0 overflow-hidden"
+              : "flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto"
+          }
+        >
+          <div className={isFullBleedEditor ? "w-full h-full" : "mx-auto max-w-6xl"}>
             {children}
           </div>
         </main>

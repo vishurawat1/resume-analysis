@@ -23,11 +23,10 @@ export async function getCachedResponse(cacheKey: string): Promise<string | null
     
     if (cacheSnap.exists()) {
       const data = cacheSnap.data();
-      if (data?.response) {
+      if (data && typeof data.response === "string") {
         console.log(`[CacheService] Firestore Cache HIT for key: ${cacheKey.slice(0, 12)}...`);
-        // Store in memory for subsequent hits
-        memoryCache.set(cacheKey, { response: data.response as string, timestamp: Date.now() });
-        return data.response as string;
+        memoryCache.set(cacheKey, { response: data.response, timestamp: Date.now() });
+        return data.response;
       }
     }
     return null;

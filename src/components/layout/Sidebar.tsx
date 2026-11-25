@@ -12,7 +12,7 @@ import {
   Wand2,
   FileCheck,
   CheckCircle2,
-  FileEdit
+  FileCode2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,11 +34,11 @@ const navigation: NavItem[] = [
     highlight: true,
   },
   { 
-    name: "In-App Resume Studio", 
+    name: "LaTeX Studio (Overleaf)", 
     href: "/dashboard/editor", 
-    icon: FileEdit,
-    description: "Canva-style editor & 1-click AI",
-    badge: "New",
+    icon: FileCode2,
+    description: "Compile .tex to exact Overleaf PDF",
+    badge: "TeX",
   },
   { 
     name: "ATS Score & Report", 

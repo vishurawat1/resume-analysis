@@ -113,6 +113,7 @@ export default function AnalysisPage() {
       setRawResumeText(resumeText);
       setOptimizedResumeText(resumeText); // Initialize the optimized version
 
+      // Call Deep AI Analysis
       // 1. Check if this exact resume and JD was already analyzed in this session
       const cachedAiResultStr = sessionStorage.getItem("aiResult");
       const cachedResume = sessionStorage.getItem("analyzedResumeText");
@@ -273,7 +274,7 @@ export default function AnalysisPage() {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-foreground text-background text-xs font-bold hover:opacity-90 transition-all shadow-xs cursor-pointer"
           >
             <FileEdit className="w-3.5 h-3.5" />
-            <span>Open in Resume Studio</span>
+            <span>Open in LaTeX Studio</span>
           </Link>
           <DownloadResumeButton resumeText={optimizedResumeText} fileName={"Optimized_" + fileName} />
           {aiResult && <SaveAnalysisButton resumeText={optimizedResumeText} atsScore={aiResult.overallScore} />}
@@ -439,7 +440,7 @@ export default function AnalysisPage() {
                 className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-xs font-bold hover:bg-primary/90 transition-all shadow-xs shrink-0 cursor-pointer"
               >
                 <FileEdit className="w-4 h-4" />
-                <span>Live Canvas Editor</span>
+                <span>Open LaTeX Studio (Overleaf)</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>

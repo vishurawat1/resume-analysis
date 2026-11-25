@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import Link from "next/link";
 import Image from "next/image";
-import { User, Bell, Menu, LogOut, Sun, Moon, CheckCircle2, UploadCloud, FileEdit } from "lucide-react";
+import { User, Bell, Menu, LogOut, Sun, Moon, CheckCircle2, UploadCloud, FileCode2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
@@ -42,8 +42,8 @@ export function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
           href="/dashboard/editor"
           className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card border border-border text-foreground text-xs font-semibold hover:bg-muted transition-colors shadow-xs cursor-pointer"
         >
-          <FileEdit className="w-3.5 h-3.5 text-primary" />
-          <span>Resume Studio</span>
+          <FileCode2 className="w-3.5 h-3.5 text-emerald-500" />
+          <span>LaTeX Studio</span>
         </Link>
 
         <Link

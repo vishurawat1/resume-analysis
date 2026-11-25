@@ -53,6 +53,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className={`${fontSans.variable} h-full antialiased`}>
       <head>
+        <meta name="color-scheme" content="light dark" />
         <script
           dangerouslySetInnerHTML={{
             __html: `

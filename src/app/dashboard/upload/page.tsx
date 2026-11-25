@@ -193,6 +193,9 @@ export default function UploadPage() {
           disabled={!file || !extractedText || isParsing || isSaving}
           onClick={() => {
             if (extractedText) {
+              // Reset prior LaTeX source so the new uploaded resume converts fresh to Overleaf .tex
+              sessionStorage.removeItem("resumeLatexSource");
+              sessionStorage.removeItem("resumeStructuredData");
               sessionStorage.setItem("resumeText", extractedText);
               sessionStorage.setItem("jobDescription", jobDescription);
               sessionStorage.setItem("fileName", file?.name || "resume.pdf");
@@ -208,7 +211,7 @@ export default function UploadPage() {
           )}
         >
           <FileEdit className="w-4 h-4 text-primary" />
-          <span>Open in Resume Studio</span>
+          <span>Open in LaTeX Studio</span>
         </button>
 
         <button
@@ -236,10 +239,12 @@ export default function UploadPage() {
                 updatedAt: new Date().toISOString()
               });
               
-              // Clear prior analysis session cache so new file triggers a fresh scan
+              // Clear prior analysis & editor session cache so new file triggers a fresh scan & LaTeX build
               sessionStorage.removeItem("aiResult");
               sessionStorage.removeItem("analyzedResumeText");
               sessionStorage.removeItem("analyzedJobDesc");
+              sessionStorage.removeItem("resumeLatexSource");
+              sessionStorage.removeItem("resumeStructuredData");
 
               // Also keep it in sessionStorage for backward compatibility/immediate synchronous access
               sessionStorage.setItem("resumeText", extractedText);

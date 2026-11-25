@@ -1,0 +1,510 @@
+"use client";
+
+import React, { useId, useState } from "react";
+import {
+  Briefcase,
+  Building2,
+  Check,
+  CheckCircle2,
+  Loader2,
+  MapPin,
+  Plus,
+  Sparkles,
+  Target,
+  Wand2,
+  X,
+} from "lucide-react";
+import { Suggestion } from "@/components/analysis/ImprovementSuggestionCard";
+
+interface AiLatexSidebarProps {
+  onClose: () => void;
+  aiSuggestions: Suggestion[];
+  appliedSuggestionIds: Set<number>;
+  onApplySuggestion: (sug: Suggestion, idx: number) => void;
+  jobTitle: string;
+  company: string;
+  location: string;
+  jobDescription: string;
+  onJobDescriptionChange: (jd: string) => void;
+  missingKeywords: string[];
+  onAddKeywordToSkills: (kw: string) => void;
+  onInsertBulletSnippet: (plainBullet: string) => void;
+  onTailorFullTex: () => Promise<void>;
+  isTailoringTex: boolean;
+  tailorSummary: string[];
+}
+
+export function AiLatexSidebar({
+  onClose,
+  aiSuggestions,
+  appliedSuggestionIds,
+  onApplySuggestion,
+  jobTitle,
+  company,
+  location,
+  jobDescription,
+  onJobDescriptionChange,
+  missingKeywords,
+  onAddKeywordToSkills,
+  onInsertBulletSnippet,
+  onTailorFullTex,
+  isTailoringTex,
+  tailorSummary,
+}: AiLatexSidebarProps) {
+  const [activeTab, setActiveTab] = useState<"ai" | "jd">("ai");
+  const [customDraft, setCustomDraft] = useState("");
+  const [customTone, setCustomTone] = useState("Metrics and Data Focused");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedOptions, setGeneratedOptions] = useState<Array<{ text: string; reasoning: string }>>([]);
+  const [insertedOptionIdx, setInsertedOptionIdx] = useState<number | null>(null);
+  const [genError, setGenError] = useState("");
+
+  const aiTabId = useId();
+  const jdTabId = useId();
+  const draftInputId = useId();
+  const toneSelectId = useId();
+  const jdTextareaId = useId();
+
+  const handleGenerateBullets = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customDraft.trim()) return;
+    setIsGenerating(true);
+    setGeneratedOptions([]);
+    setGenError("");
+
+    try {
+      const res = await fetch("/api/enhance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draft: customDraft,
+          role: jobTitle || "Software Engineer",
+          tone: customTone,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to generate bullets");
+      if (Array.isArray(data.options)) {
+        setGeneratedOptions(data.options);
+      }
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : "Generation error");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleKeywordBullet = async (kw: string) => {
+    setActiveTab("ai");
+    const promptDraft = `Demonstrate measurable production impact engineering solutions with ${kw}`;
+    setCustomDraft(promptDraft);
+    setIsGenerating(true);
+    setGeneratedOptions([]);
+    setGenError("");
+
+    try {
+      const res = await fetch("/api/enhance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draft: promptDraft,
+          role: jobTitle || "Software Engineer",
+          tone: "Metrics and Data Focused",
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.options)) {
+        setGeneratedOptions(data.options);
+      }
+    } catch {
+      setGenError("Could not generate keyword bullet right now.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <aside
+      aria-label="AI LaTeX Assistant"
+      className="w-full sm:w-96 border-l border-border bg-card flex flex-col shrink-0 h-full min-h-0 shadow-xl z-20"
+    >
+      {/* Drawer Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-bold text-sm text-foreground truncate">Overleaf AI Copilot</h2>
+            <p className="text-[11px] text-muted-foreground truncate">
+              Auto-escapes LaTeX &amp; injects ATS impact
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close AI Copilot drawer"
+          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Accessible WAI-ARIA Tablist */}
+      <div
+        role="tablist"
+        aria-label="AI Copilot sections"
+        className="flex border-b border-border bg-muted/30 shrink-0 px-2"
+      >
+        <button
+          type="button"
+          id={aiTabId}
+          role="tab"
+          aria-selected={activeTab === "ai"}
+          onClick={() => setActiveTab("ai")}
+          className={`relative flex-1 py-2.5 px-3 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+            activeTab === "ai"
+              ? "text-primary after:content-[''] after:absolute after:inset-x-2 after:bottom-0 after:border-b-2 after:border-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Wand2 className="w-3.5 h-3.5" />
+          <span>AI Polish &amp; Tailor</span>
+          {aiSuggestions.length - appliedSuggestionIds.size > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-primary/15 text-primary">
+              {aiSuggestions.length - appliedSuggestionIds.size}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          id={jdTabId}
+          role="tab"
+          aria-selected={activeTab === "jd"}
+          onClick={() => setActiveTab("jd")}
+          className={`relative flex-1 py-2.5 px-3 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+            activeTab === "jd"
+              ? "text-primary after:content-[''] after:absolute after:inset-x-2 after:bottom-0 after:border-b-2 after:border-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Target className="w-3.5 h-3.5" />
+          <span>Target JD</span>
+          {missingKeywords.length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-500">
+              {missingKeywords.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Scrollable Body */}
+      <div className="flex-1 min-h-0 overflow-y-auto latex-scroller p-4 space-y-5">
+        {/* Panel 1: AI Polish & Tailor */}
+        <div role="tabpanel" aria-labelledby={aiTabId} hidden={activeTab !== "ai"}>
+          {activeTab === "ai" && (
+            <div className="space-y-5">
+              {/* 1-Click Tailor Whole .tex Document */}
+              <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-primary" />
+                    <span>Tailor Full LaTeX to Job</span>
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Upgrades your <code className="text-[10px] font-mono bg-muted px-1 rounded">main.tex</code> bullets with Google XYZ metrics while preserving valid TeX Live syntax.
+                </p>
+                <button
+                  type="button"
+                  onClick={onTailorFullTex}
+                  disabled={isTailoringTex || !jobDescription.trim()}
+                  className="w-full py-2 px-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isTailoringTex ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Optimizing main.tex...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="w-3.5 h-3.5" />
+                      <span>
+                        {jobDescription.trim()
+                          ? "Auto-Tailor .tex to Target JD"
+                          : "Add Target JD First (Target JD Tab)"}
+                      </span>
+                    </>
+                  )}
+                </button>
+
+                {tailorSummary.length > 0 && (
+                  <ul className="pt-2 border-t border-primary/15 space-y-1 text-[11px] text-foreground">
+                    {tailorSummary.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Scanned ATS Suggestions */}
+              {aiSuggestions.length > 0 && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span className="text-foreground">Scanned Bullet Upgrades</span>
+                    <span className="text-muted-foreground font-mono text-[11px]">
+                      {appliedSuggestionIds.size}/{aiSuggestions.length}
+                    </span>
+                  </div>
+
+                  {aiSuggestions.map((sug, idx) => {
+                    const isApplied = appliedSuggestionIds.has(idx);
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-xl border text-xs space-y-2 transition-all ${
+                          isApplied
+                            ? "bg-emerald-500/5 border-emerald-500/30 opacity-75"
+                            : "bg-background border-border"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-primary/10 text-primary">
+                            {sug.impact} Impact
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground line-through">
+                          {sug.original}
+                        </p>
+                        <p className="text-[11px] text-foreground font-medium bg-emerald-500/5 p-2 rounded border border-emerald-500/20">
+                          {sug.improved}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => onApplySuggestion(sug, idx)}
+                          disabled={isApplied}
+                          className={`w-full py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors ${
+                            isApplied
+                              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                              : "bg-foreground text-background hover:opacity-90"
+                          }`}
+                        >
+                          {isApplied ? (
+                            <>
+                              <Check className="w-3 h-3" />
+                              <span>Applied to main.tex</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3 h-3" />
+                              <span>Apply to main.tex</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Custom Google XYZ Bullet -> \resumeItem Generator */}
+              <form
+                onSubmit={handleGenerateBullets}
+                className="p-3.5 rounded-xl bg-muted/40 border border-border space-y-2.5"
+              >
+                <div className="flex items-center justify-between">
+                  <label htmlFor={draftInputId} className="text-xs font-bold text-foreground">
+                    Generate LaTeX Bullet Point
+                  </label>
+                  <span className="text-[10px] text-muted-foreground">Auto-Escaped</span>
+                </div>
+                <textarea
+                  id={draftInputId}
+                  rows={3}
+                  value={customDraft}
+                  onChange={(e) => setCustomDraft(e.target.value)}
+                  placeholder="Describe what you built or tools used (e.g. Built caching layer with Redis reducing latency)..."
+                  className="w-full p-2.5 rounded-lg bg-background border border-border text-xs text-foreground leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
+                />
+
+                <div>
+                  <label htmlFor={toneSelectId} className="sr-only">
+                    Bullet Focus Tone
+                  </label>
+                  <select
+                    id={toneSelectId}
+                    value={customTone}
+                    onChange={(e) => setCustomTone(e.target.value)}
+                    className="w-full p-2 rounded-lg bg-background border border-border text-xs font-medium text-foreground"
+                  >
+                    <option value="Metrics and Data Focused">Metrics &amp; Data Focused</option>
+                    <option value="Technical Depth and Scale">Technical Depth &amp; Scale</option>
+                    <option value="Leadership and Initiative">Leadership &amp; Initiative</option>
+                  </select>
+                </div>
+
+                {genError && (
+                  <p role="alert" className="text-[11px] text-destructive font-medium">
+                    {genError}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isGenerating || !customDraft.trim()}
+                  className="w-full py-2 rounded-lg bg-foreground text-background text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Writing TeX Bullets...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Generate \resumeItem Options</span>
+                    </>
+                  )}
+                </button>
+
+                {generatedOptions.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    {generatedOptions.map((opt, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-lg bg-background border border-border space-y-2 text-[11px]"
+                      >
+                        <p className="text-foreground font-medium leading-relaxed">{opt.text}</p>
+                        <p className="text-[10px] text-muted-foreground italic">{opt.reasoning}</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onInsertBulletSnippet(opt.text);
+                            setInsertedOptionIdx(idx);
+                            setTimeout(() => setInsertedOptionIdx(null), 2000);
+                          }}
+                          className="w-full py-1 px-2 rounded bg-primary/10 hover:bg-primary/20 text-primary font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                        >
+                          {insertedOptionIdx === idx ? (
+                            <>
+                              <Check className="w-3 h-3" />
+                              <span>Inserted into main.tex!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3 h-3" />
+                              <span>Insert \resumeItem at Cursor</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </form>
+            </div>
+          )}
+        </div>
+
+        {/* Panel 2: Target JD & Keywords */}
+        <div role="tabpanel" aria-labelledby={jdTabId} hidden={activeTab !== "jd"}>
+          {activeTab === "jd" && (
+            <div className="space-y-5">
+              {(jobTitle || company || location) && (
+                <div className="p-3 rounded-xl bg-muted/40 border border-border space-y-1.5 text-xs">
+                  {jobTitle && (
+                    <div className="flex items-center gap-1.5 font-bold text-foreground">
+                      <Briefcase className="w-3.5 h-3.5 text-primary shrink-0" />
+                      <span className="truncate">{jobTitle}</span>
+                    </div>
+                  )}
+                  {company && (
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Building2 className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{company}</span>
+                    </div>
+                  )}
+                  {location && (
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <MapPin className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{location}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Missing Keywords */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-foreground">Missing Target Keywords</span>
+                  <span className="font-mono text-[11px] text-muted-foreground">
+                    {missingKeywords.length}
+                  </span>
+                </div>
+
+                {missingKeywords.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {missingKeywords.map((kw, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between gap-2 p-2 rounded-lg bg-background border border-border text-xs"
+                      >
+                        <span className="font-semibold text-foreground truncate min-w-0">
+                          {kw}
+                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleKeywordBullet(kw)}
+                            className="px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Wand2 className="w-2.5 h-2.5" />
+                            <span>Bullet</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onAddKeywordToSkills(kw)}
+                            className="px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                            title="Inject directly into LaTeX Technical Skills"
+                          >
+                            <Plus className="w-2.5 h-2.5" />
+                            <span>Skill</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>All scanned keywords covered!</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Editable Job Description */}
+              <div className="space-y-2">
+                <label htmlFor={jdTextareaId} className="text-xs font-bold text-foreground block">
+                  Target Job Description
+                </label>
+                <textarea
+                  id={jdTextareaId}
+                  rows={8}
+                  value={jobDescription}
+                  onChange={(e) => onJobDescriptionChange(e.target.value)}
+                  placeholder="Paste target Job Description here to enable 1-Click Auto-Tailor .tex..."
+                  className="w-full p-2.5 rounded-xl bg-background border border-border text-[11px] text-foreground leading-relaxed latex-scroller focus:outline-none focus:ring-2 focus:ring-primary/40 resize-y"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </aside>
+  );
+}

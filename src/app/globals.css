@@ -36,6 +36,7 @@
 
 /* ── Light Mode (Clean Architectural Minimalist) ── */
 :root {
+  color-scheme: light dark;
   --background: #fafafa;
   --foreground: #09090b;
 
@@ -66,6 +67,7 @@
 
 /* ── Dark Mode (Refined Deep Obsidian Minimalist) ── */
 .dark {
+  color-scheme: dark;
   --background: #09090b;
   --foreground: #fafafa;
 
@@ -214,6 +216,33 @@ body {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ── Dedicated IDE Scroller Styling (Modern Web Guidance) ── */
+.latex-scroller {
+  --scrollbar-thumb: light-dark(#a1a1aa, #3f3f46);
+  --scrollbar-track: transparent;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+@supports not (scrollbar-color: auto) {
+  .latex-scroller {
+    scrollbar-width: auto;
+  }
+  .latex-scroller::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .latex-scroller::-webkit-scrollbar-thumb {
+    background: #71717a;
+    border-radius: 9999px;
+  }
+  .latex-scroller::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
 
 

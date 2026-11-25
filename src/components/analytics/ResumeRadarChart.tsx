@@ -1,8 +1,11 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer, Tooltip } from "recharts";
+
+const emptySubscribe = () => () => {};
+const useIsClient = () => useSyncExternalStore(emptySubscribe, () => true, () => false);
 
 const SUBJECT_DISPLAY_MAP: Record<string, string> = {
   KeywordOptimization: "Keywords",
@@ -35,13 +38,9 @@ const FULL_NAME_MAP: Record<string, string> = {
 
 export function ResumeRadarChart({ sectionScores }: { sectionScores: Record<string, number> }) {
   const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const isClient = useIsClient();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const isDark = mounted ? resolvedTheme === "dark" : false;
+  const isDark = isClient ? resolvedTheme === "dark" : false;
 
   const data = Object.entries(sectionScores || {}).map(([key, value]) => {
     const cleanKey = key.trim();
@@ -92,18 +91,18 @@ export function ResumeRadarChart({ sectionScores }: { sectionScores: Record<stri
             fillOpacity={isDark ? 0.45 : 0.35}
             strokeWidth={2.5}
           />
-          <Tooltip 
-            formatter={(val: any, _name: any, item: any) => [
+          <Tooltip
+            formatter={(val: unknown, _name: unknown, item: { payload?: { fullSubject?: string } }) => [
               `${val} / 100`,
-              item?.payload?.fullSubject || "Score"
+              item?.payload?.fullSubject || "Score",
             ]}
             contentStyle={{
               backgroundColor: tooltipBg,
               borderColor: tooltipBorder,
-              borderRadius: '8px',
+              borderRadius: "8px",
               color: tooltipText,
-              fontSize: '12px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.25)'
+              fontSize: "12px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
             }}
             itemStyle={{ color: radarStroke, fontWeight: 600 }}
           />
