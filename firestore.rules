@@ -4,13 +4,87 @@ rules_version = '2';
 // Assumed Data Model
 // ===============================================================
 //
-// Collection: users/{userId} and subcollections
-// Document ID: userId (matches auth.uid)
-// Subcollections:
-//   - data/resume: User resume text, target job description, settings, and ATS score
-//   - data/settings: User home location and work preferences
+// Collection: users/{userId}
+// Document ID: userId (matches request.auth.uid)
+// Fields (client-editable profile & synced preference fields):
+//   - homeLocation: string (optional, 0..200 chars)
+//   - workPreference: string (optional, 0..50 chars)
+//   - githubUsername: string (optional, 0..100 chars)
+//   - targetTrack: string (optional, 0..100 chars)
+//   - preferredLatexTemplate: string (optional, 0..64 chars)
+//   - displayName: string (optional, 0..120 chars)
+//   - email: string (optional, 0..254 chars)
+//   - photoURL: string (optional, 0..2048 chars)
+//   - uid: string (optional, must equal userId, immutable on update)
+//   - createdAt: timestamp or ISO string (optional, immutable on update)
+//   - updatedAt: timestamp or ISO string (optional, 1..64 chars if string)
+//   Note: Privileged/billing fields (plan, tier, role, isAdmin, credits*,
+//   stripeCustomerId, stripeSubscriptionId, billing, subscription*) are
+//   disallowed on client create and immutable on client update.
 // Access:
-//   - Read/Write: Strictly owner-only (request.auth.uid == userId).
+//   - Read / Create / Update: Strictly owner-only with schema & escalation checks.
+//   - Delete: Denied.
+//
+// Subcollection: users/{userId}/data/billing
+// Document ID: billing
+// Fields:
+//   - plan: string (required; strictly 'free' for client create/update; 'pro'/'elite' Admin SDK only)
+//   - periodKey: string (required, 'YYYY-MM' matching ^\d{4}-(0[1-9]|1[0-2])$, non-decreasing)
+//   - creditsUsed: int (required, 0..10 on free tier; non-decreasing within same periodKey)
+//   - creditsLimit: int (required, strictly 10 on free tier; immutable from client)
+//   - updatedAt: string (required, 1..64 chars)
+//   - stripeCustomerId: string (optional, Admin SDK only; blocked on client create, immutable on update)
+//   - stripeSubscriptionId: string (optional, Admin SDK only; blocked on client create, immutable on update)
+// Access:
+//   - Get: Strictly owner-only (isOwner(userId)).
+//   - List: Denied.
+//   - Create / Update: Strictly owner-only with free-tier & monotonic quota tamper guards.
+//   - Delete: Denied (prevents deleting billing doc to reset free quota).
+//
+// Subcollection: users/{userId}/data/usage
+// Document ID: usage
+// Fields:
+//   - periodKey: string (required, 'YYYY-MM' matching ^\d{4}-(0[1-9]|1[0-2])$, non-decreasing)
+//   - creditsUsed: int (required, 0..10000; non-decreasing within same periodKey)
+//   - updatedAt: string (required, 1..64 chars)
+// Access:
+//   - Get: Strictly owner-only (isOwner(userId)).
+//   - List: Denied.
+//   - Create / Update: Strictly owner-only with monotonic quota tamper guard.
+//   - Delete: Denied (prevents deleting usage doc to reset monthly quota).
+//
+// Subcollection: users/{userId}/data/resume
+// Document ID: resume
+// Fields:
+//   - text: string (optional, 0..150000 chars)
+//   - fileName: string (optional, 0..255 chars)
+//   - jobDescription: string (optional, 0..50000 chars)
+//   - jobTitle: string (optional, 0..200 chars)
+//   - company: string (optional, 0..200 chars)
+//   - location: string (optional, 0..200 chars)
+//   - atsScore: number (optional, 0..100)
+//   - latexSource: string (optional, 0..250000 chars)
+//   - latexTemplate: string (optional, 0..64 chars)
+//   - structuredData: map (optional, bounded ResumeData structure)
+//   - updatedAt: string or timestamp (optional, 1..64 chars if string)
+// Access:
+//   - Read / Write: Strictly owner-only with schema & size validation.
+//
+// Subcollection: users/{userId}/data/settings
+// Document ID: settings
+// Fields:
+//   - homeLocation: string (optional, 0..200 chars)
+//   - workPreference: string (optional, 0..50 chars)
+//   - githubUsername: string (optional, 0..100 chars)
+//   - targetTrack: string (optional, 0..100 chars)
+//   - preferredLatexTemplate: string (optional, 0..64 chars)
+//   - updatedAt: string or timestamp (optional, 1..64 chars if string)
+// Access:
+//   - Read / Write: Strictly owner-only with schema & size validation.
+//
+// Subcollection: users/{userId}/data/{docId} (other non-billing/non-usage/non-resume/non-settings docs)
+// Access:
+//   - Read / Write: Strictly owner-only; billing/privilege keys forbidden.
 //
 // Collection: ai-cache/{cacheKey}
 // Document ID: SHA-256 hex string (64 characters) of the AI prompt
@@ -19,7 +93,7 @@ rules_version = '2';
 //   - response: string (required, 1 to 200,000 characters) - Cleaned AI JSON response
 //   - createdAt: timestamp (required, recent server timestamp)
 // Access:
-//   - Get: Allowed for authenticated users and valid SHA-256 cache key lookups.
+//   - Get: Allowed for valid SHA-256 cache key lookups.
 //   - List: Denied (prevents collection enumeration and bulk scraping).
 //   - Create / Update: Allowed with strict schema validation (for authenticated users
 //     and serverless API routes running with Firebase Web Client SDK).
@@ -44,11 +118,241 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Verify UID hasn't been tampered with on create
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) ||
+             request.resource.data.uid == request.auth.uid;
+    }
+
+    // Ensure UID field is not modified on update
+    function uidNotModified() {
+      return !('uid' in request.resource.data) ||
+             request.resource.data.uid == resource.data.uid;
+    }
+
+    // Validate required fields exist
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // Validate that the document contains only the allowed fields
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Validate immutable fields remain unchanged on update
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // Validate optional string field within inclusive bounds
+    function isValidOptionalString(data, field, minLen, maxLen) {
+      return !(field in data) ||
+             (data[field] is string &&
+              data[field].size() >= minLen &&
+              data[field].size() <= maxLen);
+    }
+
+    // Validate optional timestamp or bounded ISO date string
+    function isValidOptionalTimestampOrString(data, field) {
+      return !(field in data) ||
+             data[field] is timestamp ||
+             (data[field] is string &&
+              data[field].size() > 0 &&
+              data[field].size() <= 64);
+    }
+
+    // Validate optional bounded list inside structured resume data
+    function isValidOptionalList(data, field, maxSize) {
+      return !(field in data) ||
+             data[field] == null ||
+             (data[field] is list && data[field].size() <= maxSize);
+    }
+
+    // Validate YYYY-MM billing period key (01-12 calendar months)
+    function isValidPeriodKey(key) {
+      return key is string &&
+             key.size() == 7 &&
+             key.matches('^\\d{4}-(0[1-9]|1[0-2])$');
+    }
+
     // Validate 64-character SHA-256 hex cache key format
     function isValidCacheKey(key) {
       return key is string &&
              key.size() == 64 &&
              key.matches('^[a-fA-F0-9]{64}$');
+    }
+
+    // ===============================================================
+    // Domain Validators (Called in BOTH create and update)
+    // ===============================================================
+
+    // Domain validator for users/{userId} root profile document
+    function isValidUserProfileData(data) {
+      return data.keys().size() > 0 &&
+             isValidOptionalString(data, 'homeLocation', 0, 200) &&
+             isValidOptionalString(data, 'workPreference', 0, 50) &&
+             isValidOptionalString(data, 'githubUsername', 0, 100) &&
+             isValidOptionalString(data, 'targetTrack', 0, 100) &&
+             isValidOptionalString(data, 'preferredLatexTemplate', 0, 64) &&
+             isValidOptionalString(data, 'displayName', 0, 120) &&
+             isValidOptionalString(data, 'email', 0, 254) &&
+             isValidOptionalString(data, 'photoURL', 0, 2048) &&
+             (!('uid' in data) || (data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128)) &&
+             isValidOptionalTimestampOrString(data, 'createdAt') &&
+             isValidOptionalTimestampOrString(data, 'updatedAt');
+    }
+
+    // Domain validator for users/{userId}/data/billing (free-tier client constraints)
+    function isValidBillingDoc(data) {
+      return data.keys().hasAll(['plan', 'periodKey', 'creditsUsed', 'creditsLimit', 'updatedAt']) &&
+             data.plan == 'free' &&
+             data.creditsLimit is int &&
+             data.creditsLimit == 10 &&
+             data.creditsUsed is int &&
+             data.creditsUsed >= 0 &&
+             data.creditsUsed <= 10 &&
+             isValidPeriodKey(data.periodKey) &&
+             data.updatedAt is string &&
+             data.updatedAt.size() > 0 &&
+             data.updatedAt.size() <= 64 &&
+             isValidOptionalString(data, 'stripeCustomerId', 0, 128) &&
+             isValidOptionalString(data, 'stripeSubscriptionId', 0, 128);
+    }
+
+    // Monotonic monthly quota transition guard for users/{userId}/data/billing
+    function isValidBillingQuotaTransition() {
+      return (
+        ('periodKey' in resource.data &&
+         resource.data.periodKey is string &&
+         'creditsUsed' in resource.data &&
+         resource.data.creditsUsed is int &&
+         (
+           (request.resource.data.periodKey == resource.data.periodKey &&
+            request.resource.data.creditsUsed >= resource.data.creditsUsed) ||
+           (request.resource.data.periodKey > resource.data.periodKey &&
+            isValidPeriodKey(request.resource.data.periodKey))
+         )) ||
+        // Allows initializing monthly counters if Admin SDK created a free/downgraded doc without them
+        (!('periodKey' in resource.data) && !('creditsUsed' in resource.data))
+      );
+    }
+
+    // Domain validator for users/{userId}/data/usage
+    function isValidUsageDoc(data) {
+      return data.keys().hasOnly(['periodKey', 'creditsUsed', 'updatedAt']) &&
+             data.keys().hasAll(['periodKey', 'creditsUsed', 'updatedAt']) &&
+             isValidPeriodKey(data.periodKey) &&
+             data.creditsUsed is int &&
+             data.creditsUsed >= 0 &&
+             data.creditsUsed <= 10000 &&
+             data.updatedAt is string &&
+             data.updatedAt.size() > 0 &&
+             data.updatedAt.size() <= 64;
+    }
+
+    // Monotonic monthly quota transition guard for users/{userId}/data/usage
+    function isValidUsageQuotaTransition() {
+      return (request.resource.data.periodKey == resource.data.periodKey &&
+              resource.data.creditsUsed is int &&
+              request.resource.data.creditsUsed >= resource.data.creditsUsed) ||
+             (resource.data.periodKey is string &&
+              request.resource.data.periodKey > resource.data.periodKey &&
+              isValidPeriodKey(request.resource.data.periodKey));
+    }
+
+    // Domain validator for structuredData map inside users/{userId}/data/resume
+    function isValidStructuredResume(sd) {
+      return sd is map &&
+             sd.keys().hasOnly([
+               'personalInfo',
+               'summary',
+               'experience',
+               'education',
+               'projects',
+               'skills',
+               'certifications',
+               'customSections'
+             ]) &&
+             (!('personalInfo' in sd) || sd.personalInfo == null || (sd.personalInfo is map && sd.personalInfo.size() <= 15)) &&
+             (!('summary' in sd) || sd.summary == null || (sd.summary is string && sd.summary.size() <= 10000)) &&
+             isValidOptionalList(sd, 'experience', 50) &&
+             isValidOptionalList(sd, 'education', 30) &&
+             isValidOptionalList(sd, 'projects', 50) &&
+             isValidOptionalList(sd, 'skills', 50) &&
+             isValidOptionalList(sd, 'certifications', 50) &&
+             isValidOptionalList(sd, 'customSections', 30);
+    }
+
+    // Domain validator for users/{userId}/data/resume
+    function isValidResumeDoc(data) {
+      return data.keys().size() > 0 &&
+             data.keys().hasOnly([
+               'text',
+               'fileName',
+               'jobDescription',
+               'jobTitle',
+               'company',
+               'location',
+               'atsScore',
+               'latexSource',
+               'latexTemplate',
+               'structuredData',
+               'updatedAt'
+             ]) &&
+             isValidOptionalString(data, 'text', 0, 150000) &&
+             isValidOptionalString(data, 'fileName', 0, 255) &&
+             isValidOptionalString(data, 'jobDescription', 0, 50000) &&
+             isValidOptionalString(data, 'jobTitle', 0, 200) &&
+             isValidOptionalString(data, 'company', 0, 200) &&
+             isValidOptionalString(data, 'location', 0, 200) &&
+             (!('atsScore' in data) || (data.atsScore is number && data.atsScore >= 0 && data.atsScore <= 100)) &&
+             isValidOptionalString(data, 'latexSource', 0, 250000) &&
+             isValidOptionalString(data, 'latexTemplate', 0, 64) &&
+             (!('structuredData' in data) || isValidStructuredResume(data.structuredData)) &&
+             isValidOptionalTimestampOrString(data, 'updatedAt');
+    }
+
+    // Domain validator for users/{userId}/data/settings
+    function isValidSettingsDoc(data) {
+      return data.keys().size() > 0 &&
+             data.keys().hasOnly([
+               'homeLocation',
+               'workPreference',
+               'githubUsername',
+               'targetTrack',
+               'preferredLatexTemplate',
+               'updatedAt'
+             ]) &&
+             isValidOptionalString(data, 'homeLocation', 0, 200) &&
+             isValidOptionalString(data, 'workPreference', 0, 50) &&
+             isValidOptionalString(data, 'githubUsername', 0, 100) &&
+             isValidOptionalString(data, 'targetTrack', 0, 100) &&
+             isValidOptionalString(data, 'preferredLatexTemplate', 0, 64) &&
+             isValidOptionalTimestampOrString(data, 'updatedAt');
+    }
+
+    // Domain validator for non-billing/non-usage custom docs in users/{userId}/data/{docId}
+    function isValidCustomUserDataDoc(data) {
+      return data.keys().size() > 0 &&
+             data.keys().size() <= 50 &&
+             !data.keys().hasAny([
+               'plan',
+               'tier',
+               'role',
+               'isAdmin',
+               'admin',
+               'credits',
+               'creditsUsed',
+               'creditsLimit',
+               'periodKey',
+               'billing',
+               'subscription',
+               'subscriptionStatus',
+               'stripeCustomerId',
+               'stripeSubscriptionId'
+             ]) &&
+             isValidOptionalTimestampOrString(data, 'updatedAt');
     }
 
     // Domain validator for ai-cache entries (used in BOTH create and update)
@@ -68,9 +372,186 @@ service cloud.firestore {
     // ===============================================================
     // Collection: users
     // ===============================================================
-    // Users can only read and write to their own user profile and subcollections
-    match /users/{userId}/{document=**} {
-      allow read, write: if isOwner(userId);
+    // Explicit per-document and subcollection rules (NO recursive {document=**}
+    // wildcard under users/{userId}, preventing billing/quota rule bypasses).
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       hasOnlyAllowedFields([
+                         'homeLocation',
+                         'workPreference',
+                         'githubUsername',
+                         'targetTrack',
+                         'preferredLatexTemplate',
+                         'updatedAt',
+                         'displayName',
+                         'email',
+                         'photoURL',
+                         'uid',
+                         'createdAt'
+                       ]) &&
+                       uidUnchanged() &&
+                       isValidUserProfileData(request.resource.data);
+
+      allow update: if isOwner(userId) &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                         'homeLocation',
+                         'workPreference',
+                         'githubUsername',
+                         'targetTrack',
+                         'preferredLatexTemplate',
+                         'updatedAt',
+                         'displayName',
+                         'email',
+                         'photoURL'
+                       ]) &&
+                       uidNotModified() &&
+                       areImmutableFieldsUnchanged([
+                         'uid',
+                         'createdAt',
+                         'plan',
+                         'tier',
+                         'role',
+                         'isAdmin',
+                         'admin',
+                         'credits',
+                         'creditsUsed',
+                         'creditsLimit',
+                         'periodKey',
+                         'billing',
+                         'subscription',
+                         'subscriptionStatus',
+                         'stripeCustomerId',
+                         'stripeSubscriptionId'
+                       ]) &&
+                       isValidUserProfileData(request.resource.data);
+
+      allow delete: if false;
+
+      // -------------------------------------------------------------
+      // Subcollection: users/{userId}/data/billing
+      // -------------------------------------------------------------
+      // Tamper-proof SaaS monetization guard:
+      // - Paid tiers ('pro', 'elite') & Stripe IDs are written ONLY by
+      //   server-side Admin SDK / Stripe webhook (bypasses Security Rules).
+      // - Clients can only initialize/update 'free' plan (10 credits/month)
+      //   and cannot decrement creditsUsed within the active periodKey or
+      //   delete the billing document.
+      match /data/billing {
+        allow get: if isOwner(userId);
+        allow list: if false;
+
+        allow create: if isOwner(userId) &&
+                         hasOnlyAllowedFields([
+                           'plan',
+                           'periodKey',
+                           'creditsUsed',
+                           'creditsLimit',
+                           'updatedAt'
+                         ]) &&
+                         isValidBillingDoc(request.resource.data);
+
+        allow update: if isOwner(userId) &&
+                         hasOnlyAllowedFields([
+                           'plan',
+                           'periodKey',
+                           'creditsUsed',
+                           'creditsLimit',
+                           'updatedAt',
+                           'stripeCustomerId',
+                           'stripeSubscriptionId'
+                         ]) &&
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                           'periodKey',
+                           'creditsUsed',
+                           'updatedAt'
+                         ]) &&
+                         areImmutableFieldsUnchanged([
+                           'plan',
+                           'creditsLimit',
+                           'stripeCustomerId',
+                           'stripeSubscriptionId'
+                         ]) &&
+                         isValidBillingDoc(request.resource.data) &&
+                         request.resource.data.plan == resource.data.plan &&
+                         isValidBillingQuotaTransition();
+
+        allow delete: if false;
+      }
+
+      // -------------------------------------------------------------
+      // Subcollection: users/{userId}/data/usage
+      // -------------------------------------------------------------
+      // Server-proxied monthly usage meter written with user's ID token:
+      // enforces non-decreasing creditsUsed within the active periodKey
+      // and denies deletion to prevent client-side quota resets.
+      match /data/usage {
+        allow get: if isOwner(userId);
+        allow list: if false;
+
+        allow create: if isOwner(userId) &&
+                         isValidUsageDoc(request.resource.data);
+
+        allow update: if isOwner(userId) &&
+                         isValidUsageDoc(request.resource.data) &&
+                         isValidUsageQuotaTransition();
+
+        allow delete: if false;
+      }
+
+      // -------------------------------------------------------------
+      // Subcollection: users/{userId}/data/resume
+      // -------------------------------------------------------------
+      match /data/resume {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidResumeDoc(request.resource.data);
+        allow update: if isOwner(userId) && isValidResumeDoc(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // -------------------------------------------------------------
+      // Subcollection: users/{userId}/data/settings
+      // -------------------------------------------------------------
+      match /data/settings {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidSettingsDoc(request.resource.data);
+        allow update: if isOwner(userId) && isValidSettingsDoc(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // -------------------------------------------------------------
+      // Subcollection: users/{userId}/data/{docId} (other non-billing docs)
+      // -------------------------------------------------------------
+      match /data/{docId} {
+        allow read: if isOwner(userId) &&
+                       docId != 'billing' &&
+                       docId != 'usage' &&
+                       docId != 'resume' &&
+                       docId != 'settings';
+
+        allow create: if isOwner(userId) &&
+                         docId != 'billing' &&
+                         docId != 'usage' &&
+                         docId != 'resume' &&
+                         docId != 'settings' &&
+                         docId.size() > 0 &&
+                         docId.size() <= 64 &&
+                         isValidCustomUserDataDoc(request.resource.data);
+
+        allow update: if isOwner(userId) &&
+                         docId != 'billing' &&
+                         docId != 'usage' &&
+                         docId != 'resume' &&
+                         docId != 'settings' &&
+                         isValidCustomUserDataDoc(request.resource.data);
+
+        allow delete: if isOwner(userId) &&
+                         docId != 'billing' &&
+                         docId != 'usage' &&
+                         docId != 'resume' &&
+                         docId != 'settings';
+      }
     }
 
     // ===============================================================

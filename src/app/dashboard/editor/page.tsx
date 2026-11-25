@@ -44,6 +44,7 @@ import { CompileErrorInfo, PdfPreviewPane } from "@/components/editor/PdfPreview
 import { AiLatexSidebar } from "@/components/editor/AiLatexSidebar";
 import { QuickFormDrawer } from "@/components/editor/QuickFormDrawer";
 import { getUserPref } from "@/lib/userStorage";
+import { authFetch } from "@/lib/apiClient";
 
 const LatexCodeEditor = dynamic(
   () => import("@/components/editor/LatexCodeEditor").then((mod) => mod.LatexCodeEditor),
@@ -285,7 +286,7 @@ export default function LatexResumeEditorPage() {
       const startedAt = performance.now();
 
       try {
-        const res = await fetch("/api/compile-latex", {
+        const res = await authFetch("/api/compile-latex", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tex: targetTex, compiler: targetCompiler }),
@@ -409,7 +410,7 @@ export default function LatexResumeEditorPage() {
         } else if (cachedText) {
           // Priority 3: Convert uploaded raw resume text -> JSON -> Overleaf .tex
           try {
-            const res = await fetch("/api/build-resume", {
+            const res = await authFetch("/api/build-resume", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ resumeText: cachedText }),
@@ -469,7 +470,7 @@ export default function LatexResumeEditorPage() {
             noticeMessage = "Loaded exported LaTeX source into main.tex";
           } else if (src.length > 30) {
             try {
-              const res = await fetch("/api/build-resume", {
+              const res = await authFetch("/api/build-resume", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ resumeText: src }),
@@ -700,14 +701,14 @@ export default function LatexResumeEditorPage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const parseRes = await fetch("/api/parse", { method: "POST", body: formData });
+      const parseRes = await authFetch("/api/parse", { method: "POST", body: formData });
       if (!parseRes.ok) throw new Error("Failed parsing resume document");
       const { text } = await parseRes.json();
 
       setUploadedRawText(text);
       sessionStorage.setItem("resumeText", text);
 
-      const structRes = await fetch("/api/build-resume", {
+      const structRes = await authFetch("/api/build-resume", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resumeText: text }),
@@ -771,7 +772,7 @@ export default function LatexResumeEditorPage() {
     if (!compileError) return;
     setIsFixingError(true);
     try {
-      const res = await fetch("/api/latex-assist", {
+      const res = await authFetch("/api/latex-assist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -806,7 +807,7 @@ export default function LatexResumeEditorPage() {
     setIsTailoringTex(true);
     setTailorSummary([]);
     try {
-      const res = await fetch("/api/latex-assist", {
+      const res = await authFetch("/api/latex-assist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

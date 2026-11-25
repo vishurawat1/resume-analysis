@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Download, Loader2, FileWarning, Sparkles, CheckCircle2 } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
 import { ResumeDocument, ResumeData } from "./ResumeDocument";
+import { authFetch } from "@/lib/apiClient";
 
 export function DownloadResumeButton({
   resumeText,
@@ -21,7 +22,7 @@ export function DownloadResumeButton({
 
     try {
       // 1. Convert flat text to structured JSON
-      const res = await fetch("/api/build-resume", {
+      const res = await authFetch("/api/build-resume", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resumeText }),

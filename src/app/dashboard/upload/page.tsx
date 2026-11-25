@@ -24,6 +24,7 @@ import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { getUserPref } from "@/lib/userStorage";
+import { authFetch } from "@/lib/apiClient";
 
 interface RolePreset {
   id: string;
@@ -218,7 +219,7 @@ export default function UploadPage() {
       const formData = new FormData();
       formData.append("file", selectedFile);
 
-      const response = await fetch("/api/parse", {
+      const response = await authFetch("/api/parse", {
         method: "POST",
         body: formData,
       });
@@ -289,7 +290,7 @@ export default function UploadPage() {
     setFetchJobSuccess("");
 
     try {
-      const res = await fetch("/api/fetch-job", {
+      const res = await authFetch("/api/fetch-job", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: trimmed }),

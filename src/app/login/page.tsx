@@ -25,10 +25,20 @@ export default function LoginPage() {
 
   const { user, loading: authLoading } = useAuth();
 
+  const resolvePostLoginRoute = () => {
+    if (typeof window === "undefined") return "/dashboard";
+    const param = new URLSearchParams(window.location.search).get("redirect") || "";
+    // Strictly allow only safe relative app paths (prevent open redirects)
+    if (param.startsWith("/") && !param.startsWith("//")) {
+      return param;
+    }
+    return "/dashboard";
+  };
+
   // 1. Auto-redirect as soon as user state becomes authenticated
   useEffect(() => {
     if (user && !authLoading) {
-      router.replace("/dashboard");
+      router.replace(resolvePostLoginRoute());
     }
   }, [user, authLoading, router]);
 
@@ -38,7 +48,7 @@ export default function LoginPage() {
     getRedirectResult(auth)
       .then((result) => {
         if (result?.user && isMounted) {
-          router.replace("/dashboard");
+          router.replace(resolvePostLoginRoute());
         }
       })
       .catch((err: unknown) => {

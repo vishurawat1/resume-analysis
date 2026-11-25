@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { auth } from "@/lib/firebase";
 import { usePathname, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { QuotaExceededDialog } from "@/components/billing/UsageAndUpgradeBanner";
 
 export default function DashboardLayout({
   children,
@@ -74,6 +75,7 @@ export default function DashboardLayout({
           </div>
         </main>
       </div>
+      <QuotaExceededDialog />
     </div>
   );
 }

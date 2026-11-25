@@ -25,6 +25,7 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { ImprovementSuggestionCard, Suggestion } from "@/components/analysis/ImprovementSuggestionCard";
 import { DownloadResumeButton } from "@/components/pdf/DownloadResumeButton";
+import { authFetch } from "@/lib/apiClient";
 
 interface ReviewAddon {
   category: string;
@@ -105,7 +106,7 @@ export default function ReviewPage() {
     setAcceptedCount(0);
 
     try {
-      const res = await fetch("/api/review-resume?t=" + Date.now(), {
+      const res = await authFetch("/api/review-resume?t=" + Date.now(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resumeText: text }),
@@ -170,7 +171,7 @@ export default function ReviewPage() {
       const formData = new FormData();
       formData.append("file", selectedFile);
 
-      const response = await fetch("/api/parse", {
+      const response = await authFetch("/api/parse", {
         method: "POST",
         body: formData,
       });

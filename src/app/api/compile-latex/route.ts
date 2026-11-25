@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { applyRateLimit } from "@/lib/rate-limit";
+import { verifyRequestUser } from "@/lib/serverAuth";
 import { generateCacheKey } from "@/utils/cacheKey";
 
 export const runtime = "nodejs";
@@ -187,7 +188,12 @@ async function compileViaTexLiveNet(tex: string, compiler: CompilerEngine) {
 
 export async function POST(req: NextRequest) {
   try {
-    const rateLimitResponse = applyRateLimit(req);
+    const user = await verifyRequestUser(req);
+    const rateLimitResponse = applyRateLimit(req, {
+      bucket: "compile-latex",
+      identityKey: user?.uid,
+      limit: user ? 60 : 25,
+    });
     if (rateLimitResponse) return rateLimitResponse;
 
     const body = await req.json();

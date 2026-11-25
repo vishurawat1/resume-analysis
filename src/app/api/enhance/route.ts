@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { applyRateLimit } from "@/lib/rate-limit";
-import { generateAIResponse } from "@/services/aiService";
+import { authorizeMeteredRequest, buildQuotaHeaders } from "@/lib/usageMeter";
+import { generateAIResponseWithMeta } from "@/services/aiService";
 
 export async function POST(req: NextRequest) {
   try {
-    const rateLimitResponse = applyRateLimit(req);
-    if (rateLimitResponse) return rateLimitResponse;
+    const authGate = await authorizeMeteredRequest(req, { bucket: "enhance", cost: 1, rateLimit: 40 });
+    if (!authGate.ok) return authGate.response;
 
     const { draft, role, tone } = await req.json();
 
@@ -59,11 +59,15 @@ Provide a structured JSON response EXACTLY matching this format:
 }
 `;
 
-    const text = await generateAIResponse(prompt);
+    const aiMeta = await generateAIResponseWithMeta(prompt);
+    const text = aiMeta.text;
 
     try {
       const parsedJSON = JSON.parse(text);
-      return NextResponse.json(parsedJSON);
+      const nextQuota = await authGate.consume(aiMeta.cached ? 0 : 1);
+      return NextResponse.json(parsedJSON, {
+        headers: buildQuotaHeaders(nextQuota),
+      });
     } catch {
       console.error("Failed to parse Gemini JSON:", text);
       return NextResponse.json(

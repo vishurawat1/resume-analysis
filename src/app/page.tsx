@@ -10,15 +10,12 @@ import {
   Sparkles, 
   Sun, 
   UploadCloud, 
-  Zap,
-  MapPin,
-  Building2,
   Code2,
   Briefcase,
   Database
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
 import SplashCursor from "@/components/SplashCursor";
 import { AtsPlatformsMarquee } from "@/components/landing/AtsPlatformsMarquee";
@@ -57,12 +54,16 @@ const PREVIEW_ROLES = [
   },
 ];
 
+const emptySubscribe = () => () => {};
+
 export default function LandingPage() {
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
   const [selectedRole, setSelectedRole] = useState(0);
-
-  useEffect(() => setMounted(true), []);
 
   const splashColor = mounted && resolvedTheme === "light" ? "#10b981" : "#3b82f6";
   const activeRole = PREVIEW_ROLES[selectedRole];
@@ -96,6 +97,9 @@ export default function LandingPage() {
           </Link>
           <Link href="#comparison" className="hover:text-foreground transition-colors">
             Sample Results
+          </Link>
+          <Link href="/pricing" className="hover:text-foreground transition-colors">
+            Pricing
           </Link>
           <Link href="#faq" className="hover:text-foreground transition-colors">
             FAQ
@@ -342,21 +346,24 @@ export default function LandingPage() {
             <span>— Beat the ATS filters.</span>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-5">
             <Link href="#app-tour" className="hover:text-foreground transition-colors">
               Live Demo
-            </Link>
-            <Link href="#how-it-works" className="hover:text-foreground transition-colors">
-              How It Works
             </Link>
             <Link href="#features" className="hover:text-foreground transition-colors">
               Features
             </Link>
-            <Link href="#comparison" className="hover:text-foreground transition-colors">
-              Sample Results
+            <Link href="/pricing" className="hover:text-foreground transition-colors font-semibold text-foreground">
+              Pricing
             </Link>
             <Link href="#faq" className="hover:text-foreground transition-colors">
               FAQ
+            </Link>
+            <Link href="/privacy" className="hover:text-foreground transition-colors">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:text-foreground transition-colors">
+              Terms
             </Link>
             <Link href="/dashboard" className="hover:text-foreground transition-colors">
               Dashboard

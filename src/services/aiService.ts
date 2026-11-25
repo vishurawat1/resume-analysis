@@ -52,14 +52,19 @@ export interface WaterfallProvider {
  * 4. Waterfall Tier 3: OpenAI (GPT-4o-mini)
  * 5. Saves successful response to cache
  */
-export async function generateAIResponse(prompt: string): Promise<string> {
+export interface AIResponseMeta {
+  text: string;
+  cached: boolean;
+}
+
+export async function generateAIResponseWithMeta(prompt: string): Promise<AIResponseMeta> {
   const cacheKey = generateCacheKey(prompt);
 
   // Step 1: Check Cache
   const cachedData = await getCachedResponse(cacheKey);
   if (cachedData) {
     console.log("[AI Service] CACHE HIT");
-    return cleanJSON(cachedData);
+    return { text: cleanJSON(cachedData), cached: true };
   }
 
   console.log("[AI Service] CACHE MISS - Starting AI Waterfall Pipeline");
@@ -90,7 +95,7 @@ export async function generateAIResponse(prompt: string): Promise<string> {
         console.warn("[AI Service] Cache save warning:", cacheErr)
       );
 
-      return cleaned;
+      return { text: cleaned, cached: false };
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.warn(`[AI Waterfall Tier ${i + 1}] ${provider.name} FAILED: ${errMsg}`);
@@ -107,4 +112,9 @@ export async function generateAIResponse(prompt: string): Promise<string> {
   const summary = failureLog.map((f) => `[${f.provider}: ${f.error}]`).join(" -> ");
   console.error(`[AI Waterfall] All models failed in waterfall: ${summary}`);
   throw new Error(`All AI waterfall models failed. Breakdown: ${summary}`);
+}
+
+export async function generateAIResponse(prompt: string): Promise<string> {
+  const res = await generateAIResponseWithMeta(prompt);
+  return res.text;
 }

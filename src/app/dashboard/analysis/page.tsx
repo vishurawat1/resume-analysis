@@ -38,6 +38,7 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { cn, replaceResumeSubstring } from "@/lib/utils";
 import { getUserLocalItem, getUserPref, setUserLocalItem, setUserPref } from "@/lib/userStorage";
+import { authFetch } from "@/lib/apiClient";
 
 interface DeepAIResult {
   overallScore: number;
@@ -314,7 +315,7 @@ export default function AnalysisPage() {
       // 2. Call Deep AI Analysis
       setIsAiLoading(true);
       try {
-        const res = await fetch("/api/analyze", {
+        const res = await authFetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -379,7 +380,7 @@ export default function AnalysisPage() {
     setIsAiLoading(true);
 
     try {
-      const res = await fetch("/api/analyze", {
+      const res = await authFetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

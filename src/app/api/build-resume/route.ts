@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateAIResponse } from "@/services/aiService";
-import { applyRateLimit } from "@/lib/rate-limit";
+import { generateAIResponseWithMeta } from "@/services/aiService";
+import { authorizeMeteredRequest, buildQuotaHeaders } from "@/lib/usageMeter";
 
 export async function POST(req: NextRequest) {
   try {
-    const rateLimitResponse = applyRateLimit(req);
-    if (rateLimitResponse) return rateLimitResponse;
+    const authGate = await authorizeMeteredRequest(req, { bucket: "build-resume", cost: 1, rateLimit: 30 });
+    if (!authGate.ok) return authGate.response;
 
     const { resumeText } = await req.json();
 
@@ -93,11 +93,15 @@ ${resumeText}
 """
     `;
 
-    const text = await generateAIResponse(prompt);
+    const aiMeta = await generateAIResponseWithMeta(prompt);
+    const text = aiMeta.text;
 
     try {
       const parsedJSON = JSON.parse(text);
-      return NextResponse.json(parsedJSON);
+      const nextQuota = await authGate.consume(aiMeta.cached ? 0 : 1);
+      return NextResponse.json(parsedJSON, {
+        headers: buildQuotaHeaders(nextQuota),
+      });
     } catch {
       console.error("Failed to parse JSON for PDF Build:", text);
       return NextResponse.json(

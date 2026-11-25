@@ -23,6 +23,7 @@ import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { getUserPref, setUserPref } from "@/lib/userStorage";
+import { authFetch } from "@/lib/apiClient";
 
 interface EnhancedOption {
   text: string;
@@ -158,7 +159,7 @@ export default function EnhancerPage() {
     setOptions(null);
 
     try {
-      const res = await fetch("/api/enhance", {
+      const res = await authFetch("/api/enhance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -198,7 +199,7 @@ export default function EnhancerPage() {
     setGithubError("");
 
     try {
-      const res = await fetch("/api/github-sync", {
+      const res = await authFetch("/api/github-sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -25,7 +25,10 @@ import {
   Save,
 } from "lucide-react";
 import { useTheme } from "next-themes";
+import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Crown, ArrowRight } from "lucide-react";
+import { useUsageStatus } from "@/components/billing/UsageAndUpgradeBanner";
 
 const TARGET_TRACKS = [
   {
@@ -117,6 +120,7 @@ const emptySubscribe = () => () => {};
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { usage } = useUsageStatus();
   const mounted = useSyncExternalStore(
     emptySubscribe,
     () => true,
@@ -552,8 +556,51 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* App Theme Preferences */}
+        {/* App Theme & Billing Preferences */}
         <div className="space-y-6">
+          <div className="bg-card border border-border rounded-xl p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Crown className="w-5 h-5 text-primary" /> Plan &amp; AI Credits
+              </h2>
+              <span className="rounded-full bg-primary/10 border border-primary/25 px-2.5 py-0.5 text-xs font-bold text-primary">
+                {usage?.planName || "Starter"}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Monthly Credits Used ({usage?.periodKey || "Current"})</span>
+                <span className="font-mono font-semibold text-foreground">
+                  {usage ? `${usage.creditsUsed} / ${usage.creditsLimit}` : "0 / 10"}
+                </span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{
+                    width: `${
+                      usage && usage.creditsLimit > 0
+                        ? Math.min(100, Math.round((usage.creditsUsed / usage.creditsLimit) * 100))
+                        : 0
+                    }%`,
+                  }}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Exact cached AI repeats cost 0 credits. Overleaf LaTeX builds stay unlimited.
+              </p>
+            </div>
+
+            <Link
+              href="/pricing"
+              className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-lg bg-foreground text-background text-xs font-bold hover:opacity-90 transition-opacity"
+            >
+              <span>{usage?.plan === "free" || !usage ? "Upgrade Plan" : "Manage Plan & Tiers"}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
           <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Sun className="w-5 h-5 text-primary" /> App Preferences

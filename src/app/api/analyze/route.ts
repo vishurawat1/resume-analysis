@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getResumeAnalysisPrompt } from "@/lib/prompts";
-import { applyRateLimit } from "@/lib/rate-limit";
-import { generateAIResponse } from "@/services/aiService";
+import { authorizeMeteredRequest, buildQuotaHeaders } from "@/lib/usageMeter";
+import { generateAIResponseWithMeta } from "@/services/aiService";
 
 interface RawAnalysisResult {
   overallScore?: number;
@@ -50,8 +50,8 @@ interface RawAnalysisResult {
 
 export async function POST(req: NextRequest) {
   try {
-    const rateLimitResponse = applyRateLimit(req);
-    if (rateLimitResponse) return rateLimitResponse;
+    const authGate = await authorizeMeteredRequest(req, { bucket: "analyze", cost: 1, rateLimit: 30 });
+    if (!authGate.ok) return authGate.response;
 
     const { resumeText, jobDescription, company, location, jobTitle, candidateLocation } = await req.json();
 
@@ -76,7 +76,8 @@ export async function POST(req: NextRequest) {
       jobTitle: typeof jobTitle === "string" ? jobTitle.trim() : undefined,
       candidateLocation: typeof candidateLocation === "string" ? candidateLocation.trim() : undefined,
     });
-    const text = await generateAIResponse(prompt);
+    const aiMeta = await generateAIResponseWithMeta(prompt);
+    const text = aiMeta.text;
 
     let parsed: RawAnalysisResult;
     try {
@@ -198,7 +199,10 @@ export async function POST(req: NextRequest) {
       seniorityFit,
     };
 
-    return NextResponse.json(sanitizedResult);
+    const nextQuota = await authGate.consume(aiMeta.cached ? 0 : 1);
+    return NextResponse.json(sanitizedResult, {
+      headers: buildQuotaHeaders(nextQuota),
+    });
   } catch (error: unknown) {
     console.error("Error in AI analysis:", error);
     const errorMessage = error instanceof Error ? error.message : "";

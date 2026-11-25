@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { applyRateLimit } from "@/lib/rate-limit";
+import { authorizeMeteredRequest, buildQuotaHeaders } from "@/lib/usageMeter";
 import { escapeLatex } from "@/lib/latexTemplates";
-import { generateAIResponse } from "@/services/aiService";
+import { generateAIResponseWithMeta } from "@/services/aiService";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
@@ -185,8 +185,8 @@ function isRateLimitedGithubResponse(res: Response, bodyText?: string): boolean 
 
 export async function POST(req: NextRequest) {
   try {
-    const rateLimitResponse = applyRateLimit(req);
-    if (rateLimitResponse) return rateLimitResponse;
+    const authGate = await authorizeMeteredRequest(req, { bucket: "github-sync", cost: 1, rateLimit: 35 });
+    if (!authGate.ok) return authGate.response;
 
     let rawBody: unknown;
     try {
@@ -327,6 +327,7 @@ export async function POST(req: NextRequest) {
       }));
 
     const aiBulletsMap = new Map<string, string[]>();
+    let aiCached = false;
 
     if (rankedRepos.length > 0) {
       const repoSummaries = rankedRepos.map((r) => ({
@@ -364,8 +365,9 @@ Return ONLY valid JSON matching this schema (no markdown fences):
 `;
 
       try {
-        const aiRaw = await generateAIResponse(prompt);
-        const parsed = JSON.parse(aiRaw) as {
+        const aiMeta = await generateAIResponseWithMeta(prompt);
+        aiCached = aiMeta.cached;
+        const parsed = JSON.parse(aiMeta.text) as {
           repos?: Array<{ name?: unknown; xyzBullets?: unknown }>;
         };
         if (Array.isArray(parsed?.repos)) {
@@ -401,10 +403,14 @@ Return ONLY valid JSON matching this schema (no markdown fences):
       };
     });
 
-    return NextResponse.json({
-      profile,
-      repos,
-    });
+    const nextQuota = await authGate.consume(rankedRepos.length === 0 || aiCached ? 0 : 1);
+    return NextResponse.json(
+      {
+        profile,
+        repos,
+      },
+      { headers: buildQuotaHeaders(nextQuota) }
+    );
   } catch (error) {
     console.error("[github-sync] Unexpected error:", error);
     return NextResponse.json(

@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { escapeLatex } from "@/lib/latexTemplates";
 import { getUserPref } from "@/lib/userStorage";
+import { authFetch } from "@/lib/apiClient";
 
 export interface CoverLetterPayload {
   subject: string;
@@ -268,7 +269,7 @@ export function CareerKitSection({
 
     try {
       const track = getUserPref("userTargetTrack") || undefined;
-      const res = await fetch("/api/career-kit", {
+      const res = await authFetch("/api/career-kit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -361,7 +362,7 @@ export function CareerKitSection({
     setPdfError("");
 
     try {
-      const res = await fetch("/api/compile-latex", {
+      const res = await authFetch("/api/compile-latex", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tex, compiler: "pdflatex" }),

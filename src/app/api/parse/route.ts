@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { parsePdfBuffer } from "@/lib/pdf-parser";
 import mammoth from "mammoth";
 import { applyRateLimit } from "@/lib/rate-limit";
+import { isSameOriginBrowserRequest, verifyRequestUser } from "@/lib/serverAuth";
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 export async function POST(req: NextRequest) {
   try {
-    const rateLimitResponse = applyRateLimit(req);
+    const user = await verifyRequestUser(req);
+    if (!user && !isSameOriginBrowserRequest(req)) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+    const rateLimitResponse = applyRateLimit(req, {
+      bucket: "parse",
+      identityKey: user?.uid,
+      limit: user ? 45 : 15,
+    });
     if (rateLimitResponse) return rateLimitResponse;
 
     const formData = await req.formData();

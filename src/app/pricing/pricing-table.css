@@ -1,0 +1,113 @@
+.pricing-table-wrapper {
+  overflow: auto;
+  max-inline-size: 100%;
+  max-block-size: min(560px, 78vh);
+  container-type: inline-size;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+
+.pricing-table-wrapper:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.pricing-table {
+  inline-size: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: start;
+  font-size: 0.875rem;
+}
+
+.pricing-table caption {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.pricing-table thead {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  background: var(--card);
+}
+
+.pricing-table th,
+.pricing-table td {
+  padding: 0.9rem 1rem;
+  border-block-end: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.pricing-table thead th {
+  font-weight: 700;
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.pricing-table tbody th {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--card);
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+@container (width < 600px) {
+  .pricing-table,
+  .pricing-table thead,
+  .pricing-table tbody,
+  .pricing-table tr,
+  .pricing-table th,
+  .pricing-table td {
+    display: block;
+  }
+
+  .pricing-table thead {
+    display: none;
+  }
+
+  .pricing-table tr {
+    margin-block-end: 1rem;
+    border-block-end: 2px solid var(--border);
+  }
+
+  .pricing-table tbody th {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    background: var(--muted);
+    font-weight: 700;
+  }
+
+  .pricing-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 0.65rem;
+  }
+
+  .pricing-table td:nth-child(2)::before {
+    content: var(--label-2, "Starter") ": ";
+    font-weight: 600;
+    color: var(--muted-foreground);
+  }
+
+  .pricing-table td:nth-child(3)::before {
+    content: var(--label-3, "Pro Job Seeker") ": ";
+    font-weight: 600;
+    color: var(--muted-foreground);
+  }
+
+  .pricing-table td:nth-child(4)::before {
+    content: var(--label-4, "Career Accelerator") ": ";
+    font-weight: 600;
+    color: var(--muted-foreground);
+  }
+}

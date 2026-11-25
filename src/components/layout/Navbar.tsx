@@ -5,6 +5,7 @@ import { User, Bell, Menu, LogOut, Sun, Moon, CheckCircle2, UploadCloud, FileCod
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
+import { PlanCreditPill } from "@/components/billing/UsageAndUpgradeBanner";
 
 export function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { user, signOut } = useAuth();
@@ -38,6 +39,8 @@ export function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-2.5">
+        <PlanCreditPill />
+
         <Link
           href="/dashboard/editor"
           className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card border border-border text-foreground text-xs font-semibold hover:bg-muted transition-colors shadow-xs cursor-pointer"

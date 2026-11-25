@@ -25,6 +25,7 @@ import { Suggestion } from "@/components/analysis/ImprovementSuggestionCard";
 import { ResumeData } from "@/components/pdf/ResumeDocument";
 import { formatGithubRepoToTex, generateCoverLetterLatex } from "@/lib/latexTemplates";
 import { getUserPref, setUserPref } from "@/lib/userStorage";
+import { authFetch } from "@/lib/apiClient";
 
 interface GithubSyncedRepo {
   name: string;
@@ -161,7 +162,7 @@ export function AiLatexSidebar({
     setGenError("");
 
     try {
-      const res = await fetch("/api/enhance", {
+      const res = await authFetch("/api/enhance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -191,7 +192,7 @@ export function AiLatexSidebar({
     setGenError("");
 
     try {
-      const res = await fetch("/api/enhance", {
+      const res = await authFetch("/api/enhance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -218,7 +219,7 @@ export function AiLatexSidebar({
     setGithubError("");
 
     try {
-      const res = await fetch("/api/github-sync", {
+      const res = await authFetch("/api/github-sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -288,7 +289,7 @@ export function AiLatexSidebar({
 
     try {
       const track = getUserPref("userTargetTrack") || undefined;
-      const res = await fetch("/api/career-kit", {
+      const res = await authFetch("/api/career-kit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

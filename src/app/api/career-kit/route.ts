@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { applyRateLimit } from "@/lib/rate-limit";
+import { authorizeMeteredRequest, buildQuotaHeaders } from "@/lib/usageMeter";
 import { escapeLatex } from "@/lib/latexTemplates";
-import { generateAIResponse } from "@/services/aiService";
+import { generateAIResponseWithMeta } from "@/services/aiService";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
@@ -334,8 +334,8 @@ function normalizeStringArray(input: unknown, maxItems: number): string[] {
 
 export async function POST(req: NextRequest) {
   try {
-    const rateLimitResponse = applyRateLimit(req);
-    if (rateLimitResponse) return rateLimitResponse;
+    const authGate = await authorizeMeteredRequest(req, { bucket: "career-kit", cost: 1, rateLimit: 30 });
+    if (!authGate.ok) return authGate.response;
 
     let rawBody: unknown;
     try {
@@ -448,9 +448,11 @@ ${schemaSections.join(",\n")}
 `;
 
     let parsedAI: RawCareerKitAIResponse | null = null;
+    let aiCached = false;
     try {
-      const raw = await generateAIResponse(prompt);
-      const parsed = JSON.parse(raw);
+      const aiMeta = await generateAIResponseWithMeta(prompt);
+      aiCached = aiMeta.cached;
+      const parsed = JSON.parse(aiMeta.text);
       if (parsed && typeof parsed === "object") {
         parsedAI = parsed as RawCareerKitAIResponse;
       }
@@ -574,7 +576,10 @@ ${schemaSections.join(",\n")}
       responsePayload.interviewPrep = sanitized;
     }
 
-    return NextResponse.json(responsePayload);
+    const nextQuota = await authGate.consume(aiCached ? 0 : 1);
+    return NextResponse.json(responsePayload, {
+      headers: buildQuotaHeaders(nextQuota),
+    });
   } catch (error) {
     console.error("[career-kit] Unexpected error:", error);
     return NextResponse.json(

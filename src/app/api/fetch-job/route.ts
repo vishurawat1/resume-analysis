@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import dns from "node:dns/promises";
 import net from "node:net";
-import { applyRateLimit } from "@/lib/rate-limit";
-import { generateAIResponse } from "@/services/aiService";
+import { authorizeMeteredRequest, buildQuotaHeaders } from "@/lib/usageMeter";
+import { generateAIResponseWithMeta } from "@/services/aiService";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
@@ -357,8 +357,8 @@ function inferTitleParts(rawTitle: string, sourceHost: string): { jobTitle: stri
 
 export async function POST(req: NextRequest) {
   try {
-    const rateLimitResponse = applyRateLimit(req);
-    if (rateLimitResponse) return rateLimitResponse;
+    const authGate = await authorizeMeteredRequest(req, { bucket: "fetch-job", cost: 1, rateLimit: 30 });
+    if (!authGate.ok) return authGate.response;
 
     let body: unknown;
     try {
@@ -544,9 +544,11 @@ Return ONLY valid JSON matching this exact schema (no markdown code fences):
 `;
 
     let extracted: Partial<ExtractedJobPayload> = {};
+    let aiCached = false;
     try {
-      const aiRaw = await generateAIResponse(prompt);
-      const parsed = JSON.parse(aiRaw);
+      const aiMeta = await generateAIResponseWithMeta(prompt);
+      aiCached = aiMeta.cached;
+      const parsed = JSON.parse(aiMeta.text);
       if (parsed && typeof parsed === "object") {
         extracted = parsed as Partial<ExtractedJobPayload>;
       }
@@ -583,13 +585,17 @@ Return ONLY valid JSON matching this exact schema (no markdown code fences):
       );
     }
 
-    return NextResponse.json({
-      jobTitle: jobTitle.slice(0, 200),
-      company: company.slice(0, 200),
-      location: location.slice(0, 200),
-      jobDescription: jobDescription.slice(0, 12000),
-      sourceHost,
-    });
+    const nextQuota = await authGate.consume(aiCached ? 0 : 1);
+    return NextResponse.json(
+      {
+        jobTitle: jobTitle.slice(0, 200),
+        company: company.slice(0, 200),
+        location: location.slice(0, 200),
+        jobDescription: jobDescription.slice(0, 12000),
+        sourceHost,
+      },
+      { headers: buildQuotaHeaders(nextQuota) }
+    );
   } catch (error) {
     console.error("[fetch-job] Unexpected error:", error);
     return NextResponse.json(

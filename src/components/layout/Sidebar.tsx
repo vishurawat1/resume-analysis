@@ -10,9 +10,8 @@ import {
   X, 
   Sparkles, 
   Wand2,
-  FileCheck,
-  CheckCircle2,
-  FileCode2
+  FileCode2,
+  Crown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -161,8 +160,24 @@ export function Sidebar({
           })}
         </nav>
 
-        {/* Settings footer */}
-        <div className="p-3 border-t border-border">
+        {/* Settings & Plans footer */}
+        <div className="p-3 border-t border-border space-y-1.5">
+          <Link
+            href="/pricing"
+            className="group flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/15 transition-colors"
+            onClick={() => {
+              if (window.innerWidth < 768) {
+                onClose();
+              }
+            }}
+          >
+            <Crown className="h-4 w-4 shrink-0" />
+            <div className="flex flex-col">
+              <span className="font-bold">Plans &amp; Upgrades</span>
+              <span className="text-[10px] text-primary/80">100–500 AI credits / mo</span>
+            </div>
+          </Link>
+
           <Link
             href="/dashboard/settings"
             className={cn(

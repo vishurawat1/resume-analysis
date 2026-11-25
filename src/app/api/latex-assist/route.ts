@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { applyRateLimit } from "@/lib/rate-limit";
-import { generateAIResponse } from "@/services/aiService";
+import { authorizeMeteredRequest, buildQuotaHeaders } from "@/lib/usageMeter";
+import { generateAIResponseWithMeta } from "@/services/aiService";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
 
 export async function POST(req: NextRequest) {
   try {
-    const rateLimitResponse = applyRateLimit(req);
-    if (rateLimitResponse) return rateLimitResponse;
+    const authGate = await authorizeMeteredRequest(req, { bucket: "latex-assist", cost: 1, rateLimit: 35 });
+    if (!authGate.ok) return authGate.response;
 
     const { mode, tex, errorLog, errorLine, jobDescription, missingKeywords, jobTitle } =
       await req.json();
@@ -47,12 +47,16 @@ Return ONLY valid JSON matching this exact schema (no markdown fences):
   "explanation": "<1-sentence explanation of what syntax issue was fixed>"
 }
 `;
-      const raw = await generateAIResponse(prompt);
-      const parsed = JSON.parse(raw);
-      return NextResponse.json({
-        fixedTex: parsed.fixedTex,
-        explanation: parsed.explanation || "Fixed LaTeX syntax and escaped special characters.",
-      });
+      const aiMeta = await generateAIResponseWithMeta(prompt);
+      const parsed = JSON.parse(aiMeta.text);
+      const nextQuota = await authGate.consume(aiMeta.cached ? 0 : 1);
+      return NextResponse.json(
+        {
+          fixedTex: parsed.fixedTex,
+          explanation: parsed.explanation || "Fixed LaTeX syntax and escaped special characters.",
+        },
+        { headers: buildQuotaHeaders(nextQuota) }
+      );
     }
 
     if (mode === "tailor-jd") {
@@ -86,14 +90,18 @@ Return ONLY valid JSON matching this exact schema (no markdown fences):
   "changesSummary": ["<specific upgrade 1>", "<specific upgrade 2>", "<specific upgrade 3>"]
 }
 `;
-      const raw = await generateAIResponse(prompt);
-      const parsed = JSON.parse(raw);
-      return NextResponse.json({
-        updatedTex: parsed.updatedTex,
-        changesSummary: Array.isArray(parsed.changesSummary)
-          ? parsed.changesSummary
-          : ["Tailored experience bullets and skills to align with Target JD."],
-      });
+      const aiMeta = await generateAIResponseWithMeta(prompt);
+      const parsed = JSON.parse(aiMeta.text);
+      const nextQuota = await authGate.consume(aiMeta.cached ? 0 : 1);
+      return NextResponse.json(
+        {
+          updatedTex: parsed.updatedTex,
+          changesSummary: Array.isArray(parsed.changesSummary)
+            ? parsed.changesSummary
+            : ["Tailored experience bullets and skills to align with Target JD."],
+        },
+        { headers: buildQuotaHeaders(nextQuota) }
+      );
     }
 
     return NextResponse.json({ error: "Unsupported assist mode" }, { status: 400 });
