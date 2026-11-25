@@ -3,6 +3,7 @@ import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth"
 import { getFirestore } from "firebase/firestore";
 
 const getAuthDomain = (): string => {
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim();
   const configuredDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim();
 
   if (typeof window !== "undefined") {
@@ -10,27 +11,18 @@ const getAuthDomain = (): string => {
       window.location.hostname === "localhost" ||
       window.location.hostname === "127.0.0.1";
 
-    if (!isLocalhost) {
-      // Production & preview deployments use same-origin `/__/auth/*` proxy to hide firebaseapp.com
-      return window.location.host;
+    if (isLocalhost) {
+      // Local HTTP dev requires Firebase Hosting's auth origin so popup iframe postMessage is never blocked cross-origin
+      if (projectId) return `${projectId}.firebaseapp.com`;
+      return configuredDomain || "";
     }
 
-    // Local development uses the public branded app auth proxy domain when configured
-    if (configuredDomain && !configuredDomain.endsWith(".firebaseapp.com")) {
-      return configuredDomain;
-    }
+    // Production & preview deployments use same-origin `/__/auth/*` proxy to prevent browser storage partitioning
+    return window.location.host;
   }
 
   if (configuredDomain) return configuredDomain;
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (appUrl) {
-    try {
-      return new URL(appUrl).host;
-    } catch {
-      // Fall through cleanly
-    }
-  }
+  if (projectId) return `${projectId}.firebaseapp.com`;
   return "";
 };
 

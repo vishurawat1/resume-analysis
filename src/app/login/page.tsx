@@ -153,11 +153,24 @@ export default function LoginPage() {
         setLoading(false);
 
         if (error.code === "auth/popup-closed-by-user") {
-          setError("Sign-in was cancelled or the popup was closed before completing.");
+          setError("Sign-in popup was closed before completing. Try again or use full-page redirect below.");
         } else {
           setError(getFriendlyErrorMessage(error));
         }
       });
+  };
+
+  const handleGoogleRedirectFallback = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      await signInWithRedirect(auth, provider);
+    } catch {
+      setLoading(false);
+      setError("Could not start Google redirect sign-in. Please try again.");
+    }
   };
 
   // If user is already authenticated or verifying session, show seamless loading
@@ -190,8 +203,17 @@ export default function LoginPage() {
 
         <div className="bg-card rounded-2xl shadow-xl shadow-border/50 p-8 border border-border">
           {error && (
-            <div className="mb-6 p-4 bg-destructive/10 text-destructive rounded-lg text-sm font-medium border border-destructive/20">
+            <div className="mb-6 p-4 bg-destructive/10 text-destructive rounded-lg text-sm font-medium border border-destructive/20 space-y-2">
               <p>{error}</p>
+              {error.toLowerCase().includes("popup") && (
+                <button
+                  type="button"
+                  onClick={handleGoogleRedirectFallback}
+                  className="text-xs font-semibold underline hover:opacity-80 cursor-pointer"
+                >
+                  Continue with Google using full-page redirect instead
+                </button>
+              )}
             </div>
           )}
 

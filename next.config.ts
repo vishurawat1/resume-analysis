@@ -20,7 +20,8 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/:path*",
+        // Exclude /__/auth/* and /api/* so Firebase Auth relay iframe keeps its native headers cleanly
+        source: "/((?!__/auth/|api/).*)",
         headers: securityHeaders,
       },
       {
