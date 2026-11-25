@@ -207,7 +207,7 @@ function getTemplateConfig(templateId: LatexTemplateId): TemplateConfig {
         useColorLinks: false,
         margins: { oddside: "-0.5in", textwidth: "1in", topmargin: "-0.55in", textheight: "1.1in" },
         sectionFormat:
-          "\\titleformat{\\section}{\\vspace{-4pt}\\scshape\\raggedright\\normalsize\\bfseries}{}{0em}{}[\\color{black}\\titlerule[0.4pt] \\vspace{-5pt}]",
+          "\\titleformat{\\section}{\\vspace{-4pt}\\scshape\\raggedright\\normalsize\\bfseries}{}{0em}{}[{\\color{black}\\titlerule[0.4pt]} \\vspace{-5pt}]",
         itemSep: "-2pt",
       };
     case "compact-density":

@@ -153,13 +153,17 @@ function buildDefaultCoverLetter(data: ResumeData, company?: string, jobTitle?: 
   });
 }
 
-function resolvePreferredTemplate(sessionOverride?: string | null): LatexTemplateId {
-  if (isValidLatexTemplateId(sessionOverride)) return sessionOverride;
+function resolvePreferredTemplate(preferSettingsFirst = false): LatexTemplateId {
   if (typeof window !== "undefined") {
-    const sess = sessionStorage.getItem("resumeLatexTemplate");
-    if (isValidLatexTemplateId(sess)) return sess;
     const pref = localStorage.getItem("userPreferredLatexTemplate");
-    if (isValidLatexTemplateId(pref)) return pref;
+    const sess = sessionStorage.getItem("resumeLatexTemplate");
+    if (preferSettingsFirst) {
+      if (isValidLatexTemplateId(pref)) return pref;
+      if (isValidLatexTemplateId(sess)) return sess;
+    } else {
+      if (isValidLatexTemplateId(sess)) return sess;
+      if (isValidLatexTemplateId(pref)) return pref;
+    }
   }
   return "jakes";
 }
@@ -223,6 +227,7 @@ export default function LatexResumeEditorPage() {
   const compileAbortRef = useRef<AbortController | null>(null);
   const compileSeqRef = useRef(0);
   const initialCompileTriggeredRef = useRef(false);
+  const hasHydratedRef = useRef(false);
   const lastCompiledSourceRef = useRef<string>("");
   const pendingHandoffRef = useRef<{
     bullet: string | null;
@@ -326,8 +331,14 @@ export default function LatexResumeEditorPage() {
     [activeDoc, texSource, coverLetterTex, compiler, updatePdfBlobUrl]
   );
 
-  // Hydrate initial .tex, preferred template, and cross-page handoffs on mount
+  const compileLatexRef = useRef(compileLatex);
   useEffect(() => {
+    compileLatexRef.current = compileLatex;
+  }, [compileLatex]);
+
+  // Hydrate initial .tex, preferred template, and cross-page handoffs once on mount
+  useEffect(() => {
+    if (hasHydratedRef.current) return;
     let cancelled = false;
 
     if (pendingHandoffRef.current === null) {
@@ -344,7 +355,8 @@ export default function LatexResumeEditorPage() {
       try {
         const cachedTex = sessionStorage.getItem("resumeLatexSource");
         const cachedCoverTex = sessionStorage.getItem("coverLetterLatexSource");
-        const preferredTpl = resolvePreferredTemplate(sessionStorage.getItem("resumeLatexTemplate"));
+        const hasCachedTex = Boolean(cachedTex && cachedTex.trim().length > 50);
+        const preferredTpl = resolvePreferredTemplate(!hasCachedTex);
         const cachedStructured = sessionStorage.getItem("resumeStructuredData");
         const cachedText = sessionStorage.getItem("resumeText");
         const cachedAiResult = sessionStorage.getItem("aiResult");
@@ -419,10 +431,10 @@ export default function LatexResumeEditorPage() {
             if (snap.exists()) {
               const data = snap.data();
               if (data.structuredData) resolvedStructured = data.structuredData as ResumeData;
-              if (isValidLatexTemplateId(data.latexTemplate)) {
-                resolvedTpl = data.latexTemplate;
-              }
               if (typeof data.latexSource === "string" && data.latexSource.trim().length > 50) {
+                if (isValidLatexTemplateId(data.latexTemplate)) {
+                  resolvedTpl = data.latexTemplate;
+                }
                 baseTex = data.latexSource;
               } else if (data.structuredData) {
                 baseTex = generateLatexFromResumeData(data.structuredData as ResumeData, resolvedTpl);
@@ -501,6 +513,7 @@ export default function LatexResumeEditorPage() {
         }
 
         if (cancelled) return;
+        hasHydratedRef.current = true;
 
         setTemplateId(resolvedTpl);
         setStructuredResume(resolvedStructured);
@@ -515,7 +528,7 @@ export default function LatexResumeEditorPage() {
         setIsLoadingInitial(false);
         if (!initialCompileTriggeredRef.current) {
           initialCompileTriggeredRef.current = true;
-          compileLatex(openCoverLetterOnMount ? resolvedCoverTex : baseTex);
+          compileLatexRef.current(openCoverLetterOnMount ? resolvedCoverTex : baseTex);
         }
       } finally {
         if (!cancelled) setIsLoadingInitial(false);
@@ -526,7 +539,7 @@ export default function LatexResumeEditorPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, compileLatex]);
+  }, [user]);
 
   // Debounced auto-compile on user source edits
   useEffect(() => {
@@ -538,7 +551,7 @@ export default function LatexResumeEditorPage() {
     if (`${compiler}:${targetTex}` === lastCompiledSourceRef.current) return;
 
     const timer = setTimeout(() => {
-      compileLatex(targetTex, compiler);
+      compileLatexRef.current(targetTex, compiler);
     }, 1500);
     return () => clearTimeout(timer);
   }, [
@@ -550,7 +563,6 @@ export default function LatexResumeEditorPage() {
     hasManualEdits,
     hasManualCoverEdits,
     isLoadingInitial,
-    compileLatex,
   ]);
 
   // Switch between main.tex & cover_letter.tex
