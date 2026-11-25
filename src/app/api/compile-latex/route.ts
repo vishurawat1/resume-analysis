@@ -232,7 +232,7 @@ export async function POST(req: NextRequest) {
       const tier1 = await compileViaYtotech(tex, compiler);
       if (tier1.ok) {
         cacheCompiledPdf(cacheKey, tier1.pdf);
-        return makePdfResponse(tier1.pdf, compiler, "ytotech", "MISS");
+        return makePdfResponse(tier1.pdf, compiler, "cloud-primary", "MISS");
       }
 
       if (tier1.isSyntaxError) {
@@ -256,7 +256,7 @@ export async function POST(req: NextRequest) {
       const tier2 = await compileViaTexLiveNet(tex, compiler);
       if (tier2.ok) {
         cacheCompiledPdf(cacheKey, tier2.pdf);
-        return makePdfResponse(tier2.pdf, compiler, "texlive-net", "MISS");
+        return makePdfResponse(tier2.pdf, compiler, "cloud-fallback", "MISS");
       }
 
       if (tier2.isSyntaxError) {

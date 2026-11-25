@@ -6,7 +6,7 @@ import { invalidatePlanCache } from "@/lib/usageMeter";
 export const runtime = "nodejs";
 
 const FIREBASE_PROJECT_ID =
-  process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "resume-analysis-bd6d0";
+  process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || "";
 
 function verifyStripeSignature(rawBody: string, signatureHeader: string, secret: string): boolean {
   const parts = signatureHeader.split(",").map((p) => p.trim());

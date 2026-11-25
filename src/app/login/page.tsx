@@ -53,13 +53,11 @@ export default function LoginPage() {
       })
       .catch((err: unknown) => {
         if (!isMounted) return;
-        const error = err as { code?: string; message?: string };
+        const error = err as { code?: string };
         if (error.code === "auth/unauthorized-domain") {
-          setError(
-            `Domain '${window.location.hostname}' is not authorized in Firebase.`
-          );
+          setError("Sign-in is not enabled on this hostname yet. Please open the official app URL.");
         } else if (error.code && error.code !== "auth/popup-closed-by-user") {
-          setError(error.message || "Authentication failed.");
+          setError("Sign-in could not be completed. Please try again.");
         }
         setLoading(false);
       });
@@ -87,11 +85,13 @@ export default function LoginPage() {
       case "auth/too-many-requests":
         return "Too many failed attempts. Please try again later or reset your password.";
       case "auth/unauthorized-domain":
-        return `Domain '${window.location.hostname}' is not authorized.`;
+        return "Sign-in is restricted for this domain. Please access the application via its primary web URL.";
       case "auth/operation-not-allowed":
-        return "This sign-in method is disabled in Firebase Console.";
+        return "This sign-in method is currently unavailable.";
+      case "auth/network-request-failed":
+        return "Network connection interrupted during sign-in. Please retry.";
       default:
-        return error.message || "Authentication failed. Please try again.";
+        return "Authentication failed. Please check your credentials and try again.";
     }
   };
 
@@ -106,9 +106,9 @@ export default function LoginPage() {
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
       }
-      router.replace("/dashboard");
+      router.replace(resolvePostLoginRoute());
     } catch (err: unknown) {
-      const error = err as { code?: string; message?: string };
+      const error = err as { code?: string };
       setError(getFriendlyErrorMessage(error));
       setLoading(false);
     }
@@ -127,26 +127,25 @@ export default function LoginPage() {
     popupPromise
       .then((userCredential) => {
         if (userCredential?.user) {
-          router.replace("/dashboard");
+          router.replace(resolvePostLoginRoute());
         }
       })
       .catch(async (err: unknown) => {
         if (auth.currentUser) {
-          router.replace("/dashboard");
+          router.replace(resolvePostLoginRoute());
           return;
         }
 
-        const error = err as { code?: string; message?: string };
+        const error = err as { code?: string };
 
         // If popup was blocked by browser or extension, seamlessly fall back to redirect
         if (error.code === "auth/popup-blocked") {
           try {
             await signInWithRedirect(auth, provider);
             return;
-          } catch (rErr: unknown) {
-            const redirectError = rErr as { code?: string; message?: string };
+          } catch {
             setLoading(false);
-            setError(redirectError.message || "Redirect failed.");
+            setError("Sign-in redirect failed. Please allow popups and try again.");
             return;
           }
         }
@@ -156,7 +155,7 @@ export default function LoginPage() {
         if (error.code === "auth/popup-closed-by-user") {
           setError("Sign-in was cancelled or the popup was closed before completing.");
         } else {
-          setError(error.message || "Google authentication failed.");
+          setError(getFriendlyErrorMessage(error));
         }
       });
   };

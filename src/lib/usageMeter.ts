@@ -4,7 +4,7 @@ import { applyRateLimit } from "./rate-limit";
 import { VerifiedRequestUser, verifyRequestUser } from "./serverAuth";
 
 const FIREBASE_PROJECT_ID =
-  process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "resume-analysis-bd6d0";
+  process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || "";
 
 export interface UserQuotaStatus {
   uid: string;

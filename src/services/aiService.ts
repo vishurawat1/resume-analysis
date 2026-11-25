@@ -111,7 +111,7 @@ export async function generateAIResponseWithMeta(prompt: string): Promise<AIResp
   // All waterfall providers exhausted
   const summary = failureLog.map((f) => `[${f.provider}: ${f.error}]`).join(" -> ");
   console.error(`[AI Waterfall] All models failed in waterfall: ${summary}`);
-  throw new Error(`All AI waterfall models failed. Breakdown: ${summary}`);
+  throw new Error("All AI inference providers are temporarily unavailable.");
 }
 
 export async function generateAIResponse(prompt: string): Promise<string> {

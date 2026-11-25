@@ -9,6 +9,12 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
 
+const authProxyHost =
+  process.env.FIREBASE_AUTH_HOST?.trim() ||
+  (process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    ? `${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID.trim()}.firebaseapp.com`
+    : "");
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   async headers() {
@@ -27,10 +33,11 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
+    if (!authProxyHost) return [];
     return [
       {
         source: "/__/auth/:path*",
-        destination: "https://resume-analysis-bd6d0.firebaseapp.com/__/auth/:path*",
+        destination: `https://${authProxyHost}/__/auth/:path*`,
       },
     ];
   },

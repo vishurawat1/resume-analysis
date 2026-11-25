@@ -2,7 +2,7 @@ import { createPublicKey, verify, type JsonWebKey as NodeJsonWebKey, type KeyObj
 import { NextRequest } from "next/server";
 
 const FIREBASE_PROJECT_ID =
-  process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "resume-analysis-bd6d0";
+  process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || "";
 
 const JWK_ENDPOINT =
   "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
@@ -81,6 +81,7 @@ export function extractBearerToken(req: NextRequest): string | null {
  * Cryptographically verifies a Firebase ID JWT using Google's official RS256 JWK keys.
  */
 export async function verifyFirebaseIdToken(idToken: string): Promise<VerifiedRequestUser | null> {
+  if (!FIREBASE_PROJECT_ID) return null;
   const parts = idToken.split(".");
   if (parts.length !== 3) return null;
 

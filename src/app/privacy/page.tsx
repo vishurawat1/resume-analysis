@@ -33,28 +33,28 @@ export default function PrivacyPage() {
           <div className="space-y-2">
             <h2 className="text-lg font-bold text-foreground">1. Account &amp; Data Isolation</h2>
             <p className="text-muted-foreground">
-              Your authentication is managed by Firebase Authentication. All saved resumes, target job descriptions, LaTeX documents, preferences, and billing usage records are stored in Firebase Cloud Firestore under strict owner-only rules tied to your unique user ID (`users/&#123;uid&#125;`). Browser storage keys are also scoped by UID and automatically cleared on sign-out or account switching.
+              All saved resumes, target job descriptions, LaTeX source files, preferences, and monthly usage counters are stored in an encrypted cloud database protected by strict owner-only access controls tied to your authenticated account ID. Browser session storage is also scoped per account and cleared automatically on sign-out or account switching.
             </p>
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-lg font-bold text-foreground">2. AI Processing &amp; LaTeX Compilation</h2>
+            <h2 className="text-lg font-bold text-foreground">2. AI Processing &amp; Document Compilation</h2>
             <p className="text-muted-foreground">
-              When you run an ATS scan, Career Kit generation, or bullet rewrite, only the text required for that request is transmitted to our configured AI inference providers (Google Gemini, Groq, OpenAI) via encrypted TLS connections. When compiling LaTeX resumes to PDF, your `.tex` source is sent to stateless TeX Live compilers (`ytotech` / `texlive.net`) solely to return the rendered PDF binary.
+              When you run an ATS scan, Career Kit generation, or bullet rewrite, only the text required for that request is transmitted over TLS to our inference providers. When compiling LaTeX resumes to PDF, your document source is processed statelessly solely to return your rendered PDF binary.
             </p>
           </div>
 
           <div className="space-y-2">
             <h2 className="text-lg font-bold text-foreground">3. Caching &amp; Performance</h2>
             <p className="text-muted-foreground">
-              To avoid burning duplicate inference credits, identical prompts may be cached by cryptographic SHA-256 hash without exposing directory listings or personal email identifiers.
+              To avoid consuming duplicate monthly credits, identical analysis prompts may be matched via one-way cryptographic hashes without directory listing or exposing personal email identifiers.
             </p>
           </div>
 
           <div className="space-y-2">
             <h2 className="text-lg font-bold text-foreground">4. Payments &amp; Billing</h2>
             <p className="text-muted-foreground">
-              When paid upgrades are activated via Stripe Checkout, card details are handled exclusively by Stripe&apos;s PCI-DSS compliant checkout interface. AI Resume Analyzer stores only plan entitlement metadata and monthly credit counters.
+              Paid subscription checkouts are processed through a PCI-DSS compliant third-party payment gateway. AI Resume Analyzer stores only plan tier status and monthly credit balances—never raw credit card details.
             </p>
           </div>
 

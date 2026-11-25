@@ -15,11 +15,6 @@ export async function GET() {
       status: aiReady ? "ok" : "degraded",
       timestamp: new Date().toISOString(),
       uptimeSeconds: Math.floor((Date.now() - bootTimeMs) / 1000),
-      services: {
-        aiWaterfall: aiReady,
-        latexCompiler: true,
-        billingConfigured: Boolean(process.env.STRIPE_SECRET_KEY),
-      },
     },
     { status: aiReady ? 200 : 503 }
   );

@@ -60,10 +60,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ text: extractedText });
   } catch (error: unknown) {
     console.error("Error parsing document:", error);
-    let errorMessage = error instanceof Error ? error.message : "Failed to parse document";
-    if (errorMessage.includes("Illegal character") || errorMessage.includes("FormatError")) {
-      errorMessage = "The uploaded PDF has malformed internal syntax or an unsupported font encoding. Please re-save or re-export it as a clean PDF or DOCX file.";
-    }
+    const rawMsg = error instanceof Error ? error.message : "";
+    const errorMessage =
+      rawMsg.includes("Illegal character") || rawMsg.includes("FormatError")
+        ? "The uploaded PDF has malformed internal syntax or an unsupported font encoding. Please re-save or re-export it as a clean PDF or DOCX file."
+        : "Failed to extract text from the uploaded document. Please verify it is a valid, unencrypted PDF or DOCX file.";
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

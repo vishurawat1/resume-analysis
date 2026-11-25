@@ -381,7 +381,7 @@ export default function PricingPage() {
             <div>
               <h3 className="font-bold text-sm">Enterprise Privacy &amp; Instant Cancellation</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Your resumes stay strictly isolated to your Firebase UID. Read our{" "}
+                Your resumes stay strictly isolated to your authenticated account. Read our{" "}
                 <Link href="/privacy" className="underline hover:text-foreground">
                   Privacy Policy
                 </Link>{" "}
