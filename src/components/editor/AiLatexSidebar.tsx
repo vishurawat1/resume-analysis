@@ -6,15 +6,47 @@ import {
   Building2,
   Check,
   CheckCircle2,
+  ExternalLink,
+  FileText,
+  FolderGit2,
+  GitFork,
   Loader2,
+  Mail,
   MapPin,
   Plus,
+  RefreshCw,
   Sparkles,
+  Star,
   Target,
   Wand2,
   X,
 } from "lucide-react";
 import { Suggestion } from "@/components/analysis/ImprovementSuggestionCard";
+import { ResumeData } from "@/components/pdf/ResumeDocument";
+import { formatGithubRepoToTex, generateCoverLetterLatex } from "@/lib/latexTemplates";
+
+interface GithubSyncedRepo {
+  name: string;
+  description?: string;
+  htmlUrl?: string;
+  language?: string;
+  stars?: number;
+  forks?: number;
+  topics?: string[];
+  updatedAt?: string;
+  xyzBullets?: string[];
+  latexSnippet?: string;
+}
+
+interface GithubSyncProfile {
+  username: string;
+  name?: string;
+  bio?: string;
+  avatarUrl?: string;
+  publicRepos?: number;
+  followers?: number;
+  htmlUrl?: string;
+}
 
 interface AiLatexSidebarProps {
   onClose: () => void;
@@ -29,9 +61,31 @@ interface AiLatexSidebarProps {
   missingKeywords: string[];
   onAddKeywordToSkills: (kw: string) => void;
   onInsertBulletSnippet: (plainBullet: string) => void;
+  onInsertTexSnippet?: (rawTexSnippet: string) => void;
   onTailorFullTex: () => Promise<void>;
   isTailoringTex: boolean;
   tailorSummary: string[];
+  structuredResume?: ResumeData;
+  resumePlainText?: string;
+  onLoadCoverLetterTex?: (coverLetterTex: string, meta?: { company?: string; jobTitle?: string }) => void;
+  onJobMetaChange?: (meta: { jobTitle?: string; company?: string }) => void;
+}
+
+function buildResumeFallbackText(data?: ResumeData): string {
+  if (!data) return "";
+  const parts: string[] = [];
+  if (data.personalInfo?.name) parts.push(data.personalInfo.name);
+  if (data.summary) parts.push(data.summary);
+  for (const exp of data.experience || []) {
+    parts.push(`${exp.role || ""} at ${exp.company || ""}: ${(exp.bullets || []).join(" ")}`);
+  }
+  for (const proj of data.projects || []) {
+    parts.push(`${proj.name || ""} (${proj.description || ""}): ${(proj.bullets || []).join(" ")}`);
+  }
+  for (const sk of data.skills || []) {
+    parts.push(`${sk.category || ""}: ${(sk.items || []).join(", ")}`);
+  }
+  return parts.join("\n").trim();
 }
 
 export function AiLatexSidebar({
@@ -47,11 +101,16 @@ export function AiLatexSidebar({
   missingKeywords,
   onAddKeywordToSkills,
   onInsertBulletSnippet,
+  onInsertTexSnippet,
   onTailorFullTex,
   isTailoringTex,
   tailorSummary,
+  structuredResume,
+  resumePlainText,
+  onLoadCoverLetterTex,
+  onJobMetaChange,
 }: AiLatexSidebarProps) {
-  const [activeTab, setActiveTab] = useState<"ai" | "jd">("ai");
+  const [activeTab, setActiveTab] = useState<"ai" | "jd" | "github" | "cover-letter">("ai");
   const [customDraft, setCustomDraft] = useState("");
   const [customTone, setCustomTone] = useState("Metrics and Data Focused");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -59,11 +118,40 @@ export function AiLatexSidebar({
   const [insertedOptionIdx, setInsertedOptionIdx] = useState<number | null>(null);
   const [genError, setGenError] = useState("");
 
+  // GitHub Sync State
+  const [githubUsername, setGithubUsername] = useState<string>(() =>
+    typeof window !== "undefined" ? localStorage.getItem("userGithubUsername") || "" : ""
+  );
+  const [githubTargetRole, setGithubTargetRole] = useState<string>(() => {
+    if (jobTitle) return jobTitle;
+    if (typeof window !== "undefined") return localStorage.getItem("userTargetTrack") || "";
+    return "";
+  });
+  const [isSyncingGithub, setIsSyncingGithub] = useState(false);
+  const [githubError, setGithubError] = useState("");
+  const [githubProfile, setGithubProfile] = useState<GithubSyncProfile | null>(null);
+  const [githubRepos, setGithubRepos] = useState<GithubSyncedRepo[]>([]);
+  const [insertedRepoKey, setInsertedRepoKey] = useState<string | null>(null);
+
+  // Cover Letter Generator State
+  const [clCompany, setClCompany] = useState(company);
+  const [clJobTitle, setClJobTitle] = useState(jobTitle);
+  const [clNotes, setClNotes] = useState("");
+  const [isGeneratingCl, setIsGeneratingCl] = useState(false);
+  const [clError, setClError] = useState("");
+  const [clSuccessMsg, setClSuccessMsg] = useState("");
+
   const aiTabId = useId();
   const jdTabId = useId();
+  const githubTabId = useId();
+  const coverTabId = useId();
   const draftInputId = useId();
   const toneSelectId = useId();
   const jdTextareaId = useId();
+  const ghInputId = useId();
+  const ghRoleId = useId();
+  const clCompanyId = useId();
+  const clTitleId = useId();
 
   const handleGenerateBullets = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,10 +211,175 @@ export function AiLatexSidebar({
     }
   };
 
+  const handleGithubSync = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!githubUsername.trim()) return;
+    setIsSyncingGithub(true);
+    setGithubError("");
+
+    try {
+      const res = await fetch("/api/github-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: githubUsername.trim(),
+          targetRole: (githubTargetRole || jobTitle || "Software Engineer").trim(),
+          maxRepos: 4,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || `GitHub sync failed (${res.status})`);
+      }
+
+      if (data.profile) {
+        setGithubProfile(data.profile);
+        if (data.profile.username && typeof window !== "undefined") {
+          localStorage.setItem("userGithubUsername", data.profile.username);
+        }
+      }
+      setGithubRepos(Array.isArray(data.repos) ? data.repos : []);
+    } catch (err) {
+      setGithubError(err instanceof Error ? err.message : "Could not fetch GitHub repositories.");
+    } finally {
+      setIsSyncingGithub(false);
+    }
+  };
+
+  const handleInsertGithubProject = (repo: GithubSyncedRepo) => {
+    const texBlock = formatGithubRepoToTex({
+      name: repo.name,
+      htmlUrl: repo.htmlUrl,
+      description: repo.description,
+      topics: repo.topics,
+      xyzBullets: repo.xyzBullets,
+      language: repo.language,
+      stars: repo.stars,
+      updatedAt: repo.updatedAt,
+    });
+
+    if (onInsertTexSnippet) {
+      onInsertTexSnippet(`\n${texBlock}\n`);
+    } else {
+      onInsertBulletSnippet(repo.xyzBullets?.[0] || repo.description || repo.name);
+    }
+    setInsertedRepoKey(repo.name);
+    setTimeout(() => setInsertedRepoKey(null), 2200);
+  };
+
+  const handleGenerateCoverLetterAi = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsGeneratingCl(true);
+    setClError("");
+    setClSuccessMsg("");
+
+    const effectiveCompany = (clCompany || company || "Hiring Team").trim();
+    const effectiveTitle = (clJobTitle || jobTitle || "Target Role").trim();
+    const effectiveResume =
+      (resumePlainText && resumePlainText.trim()) ||
+      buildResumeFallbackText(structuredResume) ||
+      "Experienced candidate seeking impactful role.";
+    const effectiveJd =
+      (jobDescription && jobDescription.trim()) ||
+      (clNotes && clNotes.trim()) ||
+      `Seeking a ${effectiveTitle} at ${effectiveCompany} to deliver measurable product and engineering outcomes.`;
+
+    onJobMetaChange?.({ company: effectiveCompany, jobTitle: effectiveTitle });
+
+    try {
+      const track =
+        typeof window !== "undefined" ? localStorage.getItem("userTargetTrack") || undefined : undefined;
+      const res = await fetch("/api/career-kit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "cover-letter",
+          resumeText: effectiveResume,
+          jobDescription: effectiveJd,
+          jobTitle: effectiveTitle,
+          company: effectiveCompany,
+          missingKeywords,
+          candidateName: structuredResume?.personalInfo?.name,
+          track,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Cover letter generation failed");
+      }
+
+      const cl = data?.coverLetter;
+      const latexSource =
+        typeof cl?.latexSource === "string" && cl.latexSource.includes("\\begin{document}")
+          ? cl.latexSource
+          : generateCoverLetterLatex({
+              candidateName: structuredResume?.personalInfo?.name || "Your Name",
+              email: structuredResume?.personalInfo?.email,
+              phone: structuredResume?.personalInfo?.phone,
+              location: structuredResume?.personalInfo?.location,
+              company: effectiveCompany,
+              jobTitle: effectiveTitle,
+              salutation: cl?.salutation || "Dear Hiring Manager,",
+              paragraphs:
+                Array.isArray(cl?.paragraphs) && cl.paragraphs.length > 0
+                  ? cl.paragraphs
+                  : [
+                      `I am excited to apply for the ${effectiveTitle} position at ${effectiveCompany}.`,
+                    ],
+              signOff: cl?.signOff || "Sincerely,",
+            });
+
+      onLoadCoverLetterTex?.(latexSource, {
+        company: effectiveCompany,
+        jobTitle: effectiveTitle,
+      });
+      setClSuccessMsg("Loaded AI cover letter into cover_letter.tex and compiling PDF!");
+    } catch (err) {
+      setClError(err instanceof Error ? err.message : "Could not generate cover letter right now.");
+    } finally {
+      setIsGeneratingCl(false);
+    }
+  };
+
+  const handleLoadQuickCoverLetterTemplate = () => {
+    const effectiveCompany = (clCompany || company || "Hiring Company").trim();
+    const effectiveTitle = (clJobTitle || jobTitle || "Software Engineer").trim();
+    const p = structuredResume?.personalInfo;
+    const summaryText = structuredResume?.summary?.trim();
+    const topExp = structuredResume?.experience?.[0];
+
+    const paragraphs = [
+      `I am writing to express my enthusiastic interest in the ${effectiveTitle} position at ${effectiveCompany}. ${
+        summaryText || "With a proven track record of shipping scalable, reliable systems, I am eager to contribute immediate value to your team."
+      }`,
+      topExp
+        ? `Most recently as ${topExp.role || "an engineer"} at ${topExp.company || "my current organization"}, ${
+            topExp.bullets?.[0] || "I led key technical initiatives focused on measurable performance and customer impact."
+          }`
+        : `Across my recent work, I have focused on solving ambiguous engineering problems, strengthening reliability, and delivering measurable business outcomes.`,
+      `I would welcome the opportunity to discuss how my background aligns with ${effectiveCompany}'s goals for the ${effectiveTitle} role. Thank you for your time and consideration.`,
+    ];
+
+    const latex = generateCoverLetterLatex({
+      candidateName: p?.name || "Your Name",
+      email: p?.email,
+      phone: p?.phone,
+      location: p?.location,
+      company: effectiveCompany,
+      jobTitle: effectiveTitle,
+      salutation: "Dear Hiring Manager,",
+      paragraphs,
+      signOff: "Sincerely,",
+    });
+
+    onLoadCoverLetterTex?.(latex, { company: effectiveCompany, jobTitle: effectiveTitle });
+    setClSuccessMsg("Loaded Overleaf cover letter template into cover_letter.tex!");
+  };
+
   return (
     <aside
       aria-label="AI LaTeX Assistant"
-      className="w-full sm:w-96 border-l border-border bg-card flex flex-col shrink-0 h-full min-h-0 shadow-xl z-20"
+      className="w-full sm:w-[400px] border-l border-border bg-card flex flex-col shrink-0 h-full min-h-0 shadow-xl z-20"
     >
       {/* Drawer Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
@@ -137,7 +390,7 @@ export function AiLatexSidebar({
           <div className="min-w-0">
             <h2 className="font-bold text-sm text-foreground truncate">Overleaf AI Copilot</h2>
             <p className="text-[11px] text-muted-foreground truncate">
-              Auto-escapes LaTeX &amp; injects ATS impact
+              AI Polish, Target JD, GitHub Sync &amp; Cover Letter
             </p>
           </div>
         </div>
@@ -151,11 +404,11 @@ export function AiLatexSidebar({
         </button>
       </div>
 
-      {/* Accessible WAI-ARIA Tablist */}
+      {/* Accessible WAI-ARIA Tablist (4 Panels) */}
       <div
         role="tablist"
         aria-label="AI Copilot sections"
-        className="flex border-b border-border bg-muted/30 shrink-0 px-2"
+        className="grid grid-cols-4 border-b border-border bg-muted/30 shrink-0 px-1"
       >
         <button
           type="button"
@@ -163,16 +416,16 @@ export function AiLatexSidebar({
           role="tab"
           aria-selected={activeTab === "ai"}
           onClick={() => setActiveTab("ai")}
-          className={`relative flex-1 py-2.5 px-3 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+          className={`relative py-2.5 px-1.5 text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer whitespace-nowrap ${
             activeTab === "ai"
-              ? "text-primary after:content-[''] after:absolute after:inset-x-2 after:bottom-0 after:border-b-2 after:border-primary"
+              ? "text-primary after:content-[''] after:absolute after:inset-x-1.5 after:bottom-0 after:border-b-2 after:border-primary"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Wand2 className="w-3.5 h-3.5" />
-          <span>AI Polish &amp; Tailor</span>
+          <Wand2 className="w-3.5 h-3.5 shrink-0" />
+          <span>Polish</span>
           {aiSuggestions.length - appliedSuggestionIds.size > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-primary/15 text-primary">
+            <span className="px-1 rounded-full text-[9px] font-bold bg-primary/15 text-primary">
               {aiSuggestions.length - appliedSuggestionIds.size}
             </span>
           )}
@@ -184,19 +437,51 @@ export function AiLatexSidebar({
           role="tab"
           aria-selected={activeTab === "jd"}
           onClick={() => setActiveTab("jd")}
-          className={`relative flex-1 py-2.5 px-3 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+          className={`relative py-2.5 px-1.5 text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer whitespace-nowrap ${
             activeTab === "jd"
-              ? "text-primary after:content-[''] after:absolute after:inset-x-2 after:bottom-0 after:border-b-2 after:border-primary"
+              ? "text-primary after:content-[''] after:absolute after:inset-x-1.5 after:bottom-0 after:border-b-2 after:border-primary"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Target className="w-3.5 h-3.5" />
-          <span>Target JD</span>
+          <Target className="w-3.5 h-3.5 shrink-0" />
+          <span>JD</span>
           {missingKeywords.length > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-500">
+            <span className="px-1 rounded-full text-[9px] font-bold bg-amber-500/15 text-amber-500">
               {missingKeywords.length}
             </span>
           )}
+        </button>
+
+        <button
+          type="button"
+          id={githubTabId}
+          role="tab"
+          aria-selected={activeTab === "github"}
+          onClick={() => setActiveTab("github")}
+          className={`relative py-2.5 px-1.5 text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer whitespace-nowrap ${
+            activeTab === "github"
+              ? "text-primary after:content-[''] after:absolute after:inset-x-1.5 after:bottom-0 after:border-b-2 after:border-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <FolderGit2 className="w-3.5 h-3.5 shrink-0" />
+          <span>GitHub</span>
+        </button>
+
+        <button
+          type="button"
+          id={coverTabId}
+          role="tab"
+          aria-selected={activeTab === "cover-letter"}
+          onClick={() => setActiveTab("cover-letter")}
+          className={`relative py-2.5 px-1.5 text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer whitespace-nowrap ${
+            activeTab === "cover-letter"
+              ? "text-primary after:content-[''] after:absolute after:inset-x-1.5 after:bottom-0 after:border-b-2 after:border-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Mail className="w-3.5 h-3.5 shrink-0" />
+          <span>Letter</span>
         </button>
       </div>
 
@@ -234,7 +519,7 @@ export function AiLatexSidebar({
                       <span>
                         {jobDescription.trim()
                           ? "Auto-Tailor .tex to Target JD"
-                          : "Add Target JD First (Target JD Tab)"}
+                          : "Add Target JD First (JD Tab)"}
                       </span>
                     </>
                   )}
@@ -501,6 +786,292 @@ export function AiLatexSidebar({
                   className="w-full p-2.5 rounded-xl bg-background border border-border text-[11px] text-foreground leading-relaxed latex-scroller focus:outline-none focus:ring-2 focus:ring-primary/40 resize-y"
                 />
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Panel 3: GitHub Repo Sync -> \resumeProjectHeading */}
+        <div role="tabpanel" aria-labelledby={githubTabId} hidden={activeTab !== "github"}>
+          {activeTab === "github" && (
+            <div className="space-y-4">
+              <form
+                onSubmit={handleGithubSync}
+                className="p-3.5 rounded-xl bg-muted/40 border border-border space-y-2.5"
+              >
+                <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                  <FolderGit2 className="w-4 h-4 text-primary" />
+                  <span>Sync GitHub Repositories</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Import top public repos with quantified Google XYZ bullets and 1-click inject clean{" "}
+                  <code className="font-mono text-[10px] bg-background px-1 rounded">\resumeProjectHeading</code> blocks.
+                </p>
+
+                <div>
+                  <label htmlFor={ghInputId} className="text-[11px] font-semibold text-muted-foreground block mb-1">
+                    GitHub Username or URL
+                  </label>
+                  <input
+                    id={ghInputId}
+                    type="text"
+                    value={githubUsername}
+                    onChange={(e) => setGithubUsername(e.target.value)}
+                    placeholder="e.g. octocat or github.com/octocat"
+                    className="w-full px-3 py-2 rounded-lg bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor={ghRoleId} className="text-[11px] font-semibold text-muted-foreground block mb-1">
+                    Target Role Context (Optional)
+                  </label>
+                  <input
+                    id={ghRoleId}
+                    type="text"
+                    value={githubTargetRole}
+                    onChange={(e) => setGithubTargetRole(e.target.value)}
+                    placeholder="e.g. Backend Engineer, ML Engineer"
+                    className="w-full px-3 py-2 rounded-lg bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                </div>
+
+                {githubError && (
+                  <p role="alert" className="text-[11px] text-destructive font-medium">
+                    {githubError}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isSyncingGithub || !githubUsername.trim()}
+                  className="w-full py-2 px-3 rounded-lg bg-foreground text-background hover:opacity-90 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSyncingGithub ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Fetching Repos &amp; Crafting XYZ Bullets...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Sync GitHub Projects</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {githubProfile && (
+                <div className="p-3 rounded-xl bg-background border border-border flex items-center justify-between gap-2 text-xs">
+                  <div className="min-w-0">
+                    <p className="font-bold text-foreground truncate">
+                      {githubProfile.name || `@${githubProfile.username}`}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      @{githubProfile.username}
+                      {typeof githubProfile.publicRepos === "number"
+                        ? ` · ${githubProfile.publicRepos} public repos`
+                        : ""}
+                    </p>
+                  </div>
+                  {githubProfile.htmlUrl && (
+                    <a
+                      href={githubProfile.htmlUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
+                      aria-label={`Open ${githubProfile.username} on GitHub`}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {githubRepos.length > 0 && (
+                <div className="space-y-3">
+                  {githubRepos.map((repo) => (
+                    <div
+                      key={repo.name}
+                      className="p-3 rounded-xl bg-background border border-border space-y-2.5 text-xs"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-foreground truncate">{repo.name}</span>
+                            {repo.language && (
+                              <span className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-medium text-muted-foreground shrink-0">
+                                {repo.language}
+                              </span>
+                            )}
+                          </div>
+                          {repo.description && (
+                            <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">
+                              {repo.description}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground shrink-0 font-mono">
+                          <span className="inline-flex items-center gap-0.5" title="Stars">
+                            <Star className="w-3 h-3 text-amber-500" />
+                            {repo.stars ?? 0}
+                          </span>
+                          {typeof repo.forks === "number" && (
+                            <span className="inline-flex items-center gap-0.5" title="Forks">
+                              <GitFork className="w-3 h-3" />
+                              {repo.forks}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {Array.isArray(repo.xyzBullets) && repo.xyzBullets.length > 0 && (
+                        <ul className="space-y-1.5 pt-1 border-t border-border/60">
+                          {repo.xyzBullets.map((b, bIdx) => (
+                            <li
+                              key={bIdx}
+                              className="text-[11px] text-foreground leading-relaxed bg-muted/30 p-2 rounded-lg flex items-start justify-between gap-2"
+                            >
+                              <span>{b}</span>
+                              <button
+                                type="button"
+                                onClick={() => onInsertBulletSnippet(b)}
+                                title="Insert single bullet at cursor"
+                                className="px-1.5 py-0.5 rounded bg-background border border-border hover:bg-muted text-[10px] font-semibold text-primary shrink-0 cursor-pointer"
+                              >
+                                + Item
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleInsertGithubProject(repo)}
+                        className="w-full py-1.5 px-2.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                      >
+                        {insertedRepoKey === repo.name ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Inserted \resumeProjectHeading!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Insert \resumeProjectHeading at Cursor</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Panel 4: Overleaf Cover Letter Generator -> cover_letter.tex */}
+        <div role="tabpanel" aria-labelledby={coverTabId} hidden={activeTab !== "cover-letter"}>
+          {activeTab === "cover-letter" && (
+            <div className="space-y-4">
+              <form
+                onSubmit={handleGenerateCoverLetterAi}
+                className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 space-y-3"
+              >
+                <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                  <FileText className="w-4 h-4 text-primary" />
+                  <span>Overleaf Cover Letter Studio</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Tailors a matching LaTeX cover letter into{" "}
+                  <code className="font-mono text-[10px] bg-muted px-1 rounded">cover_letter.tex</code> and compiles a crisp PDF.
+                </p>
+
+                <div className="grid grid-cols-1 gap-2">
+                  <div>
+                    <label htmlFor={clCompanyId} className="text-[11px] font-semibold text-muted-foreground block mb-1">
+                      Target Company
+                    </label>
+                    <input
+                      id={clCompanyId}
+                      type="text"
+                      value={clCompany}
+                      onChange={(e) => setClCompany(e.target.value)}
+                      placeholder="e.g. Stripe, Anthropic, Goldman Sachs"
+                      className="w-full px-3 py-2 rounded-lg bg-background border border-border text-xs text-foreground"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor={clTitleId} className="text-[11px] font-semibold text-muted-foreground block mb-1">
+                      Target Role
+                    </label>
+                    <input
+                      id={clTitleId}
+                      type="text"
+                      value={clJobTitle}
+                      onChange={(e) => setClJobTitle(e.target.value)}
+                      placeholder="e.g. Senior Backend Engineer"
+                      className="w-full px-3 py-2 rounded-lg bg-background border border-border text-xs text-foreground"
+                    />
+                  </div>
+                </div>
+
+                {!jobDescription.trim() && (
+                  <div>
+                    <label className="text-[11px] font-semibold text-muted-foreground block mb-1">
+                      Role Focus / Job Summary (Optional)
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={clNotes}
+                      onChange={(e) => setClNotes(e.target.value)}
+                      placeholder="Paste key JD requirements or why you are excited about this team..."
+                      className="w-full p-2.5 rounded-lg bg-background border border-border text-xs text-foreground resize-none"
+                    />
+                  </div>
+                )}
+
+                {clError && (
+                  <p role="alert" className="text-[11px] text-destructive font-medium">
+                    {clError}
+                  </p>
+                )}
+
+                {clSuccessMsg && (
+                  <p role="status" className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>{clSuccessMsg}</span>
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isGeneratingCl}
+                  className="w-full py-2 px-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
+                >
+                  {isGeneratingCl ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Generating Cover Letter .tex...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Generate AI Cover Letter</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleLoadQuickCoverLetterTemplate}
+                  className="w-full py-2 px-3 rounded-lg border border-border bg-background hover:bg-muted text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span>Load Instant Template into cover_letter.tex</span>
+                </button>
+              </form>
             </div>
           )}
         </div>

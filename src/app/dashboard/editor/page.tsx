@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useCallback, useEffect, useId, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
+  AlertTriangle,
   Check,
   ChevronRight,
   Code2,
@@ -13,11 +14,14 @@ import {
   FileCode2,
   FileText,
   Loader2,
+  Mail,
   Play,
   RefreshCw,
   Save,
+  SlidersHorizontal,
   Sparkles,
   UploadCloud,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
@@ -27,14 +31,18 @@ import { Suggestion } from "@/components/analysis/ImprovementSuggestionCard";
 import {
   addKeywordToTexSkills,
   applyBulletUpgradeToTex,
+  extractTexInsights,
   formatAsResumeItem,
+  generateCoverLetterLatex,
   generateLatexFromResumeData,
+  isValidLatexTemplateId,
   LATEX_TEMPLATES,
   LatexTemplateId,
 } from "@/lib/latexTemplates";
 import type { LatexCodeEditorHandle } from "@/components/editor/LatexCodeEditor";
 import { CompileErrorInfo, PdfPreviewPane } from "@/components/editor/PdfPreviewPane";
 import { AiLatexSidebar } from "@/components/editor/AiLatexSidebar";
+import { QuickFormDrawer } from "@/components/editor/QuickFormDrawer";
 
 const LatexCodeEditor = dynamic(
   () => import("@/components/editor/LatexCodeEditor").then((mod) => mod.LatexCodeEditor),
@@ -121,18 +129,58 @@ const DEFAULT_RESUME_DATA: ResumeData = {
   customSections: [],
 };
 
+function buildDefaultCoverLetter(data: ResumeData, company?: string, jobTitle?: string): string {
+  const p = data.personalInfo || {};
+  const roleLabel = jobTitle || "target role";
+  const companyLabel = company || "your team";
+  return generateCoverLetterLatex({
+    candidateName: p.name || "Alex Rivera",
+    email: p.email,
+    phone: p.phone,
+    location: p.location,
+    company: company || "Hiring Team",
+    jobTitle: jobTitle || "",
+    salutation: "Dear Hiring Manager,",
+    paragraphs: [
+      `I am writing to express my strong interest in joining ${companyLabel} for the ${roleLabel}. ${
+        data.summary || "With hands-on experience delivering reliable, scalable systems, I bring a focus on measurable execution."
+      }`,
+      data.experience?.[0]?.bullets?.[0] ||
+        "In my most recent role, I architected production services, improved latency, and collaborated closely across product and engineering.",
+      `Thank you for considering my application. I look forward to discussing how I can contribute to ${companyLabel}.`,
+    ],
+    signOff: "Sincerely,",
+  });
+}
+
+function resolvePreferredTemplate(sessionOverride?: string | null): LatexTemplateId {
+  if (isValidLatexTemplateId(sessionOverride)) return sessionOverride;
+  if (typeof window !== "undefined") {
+    const sess = sessionStorage.getItem("resumeLatexTemplate");
+    if (isValidLatexTemplateId(sess)) return sess;
+    const pref = localStorage.getItem("userPreferredLatexTemplate");
+    if (isValidLatexTemplateId(pref)) return pref;
+  }
+  return "jakes";
+}
+
 export default function LatexResumeEditorPage() {
   const { user } = useAuth();
 
-  // Editor Core State
+  // Multi-file IDE State (main.tex & cover_letter.tex)
+  const [activeDoc, setActiveDoc] = useState<"resume" | "cover-letter">("resume");
   const [texSource, setTexSource] = useState<string>(() =>
     generateLatexFromResumeData(DEFAULT_RESUME_DATA, "jakes")
+  );
+  const [coverLetterTex, setCoverLetterTex] = useState<string>(() =>
+    buildDefaultCoverLetter(DEFAULT_RESUME_DATA)
   );
   const [structuredResume, setStructuredResume] = useState<ResumeData>(DEFAULT_RESUME_DATA);
   const [templateId, setTemplateId] = useState<LatexTemplateId>("jakes");
   const [compiler, setCompiler] = useState<"pdflatex" | "xelatex" | "lualatex">("pdflatex");
   const [autoCompile, setAutoCompile] = useState(true);
   const [hasManualEdits, setHasManualEdits] = useState(false);
+  const [hasManualCoverEdits, setHasManualCoverEdits] = useState(false);
 
   // Loading & Build Status
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
@@ -143,10 +191,12 @@ export default function LatexResumeEditorPage() {
   const [compilerBackend, setCompilerBackend] = useState<string | null>(null);
   const [compileDurationMs, setCompileDurationMs] = useState<number | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [handoffNotice, setHandoffNotice] = useState<string | null>(null);
 
   // Panels & Overlays
   const [mobilePane, setMobilePane] = useState<"code" | "pdf" | "original">("code");
   const [showAiSidebar, setShowAiSidebar] = useState(false);
+  const [showQuickForm, setShowQuickForm] = useState(false);
   const [showOriginalCompare, setShowOriginalCompare] = useState(false);
   const [uploadedPdfUrl, setUploadedPdfUrl] = useState<string | null>(null);
   const [uploadedRawText, setUploadedRawText] = useState<string>("");
@@ -168,19 +218,31 @@ export default function LatexResumeEditorPage() {
   const confirmDialogRef = useRef<HTMLDialogElement>(null);
   const editorRef = useRef<LatexCodeEditorHandle>(null);
 
-  // Refs for cancellation & cleanup
+  // Refs for cancellation, handoff preservation & cleanup
   const activePdfUrlRef = useRef<string | null>(null);
   const compileAbortRef = useRef<AbortController | null>(null);
   const compileSeqRef = useRef(0);
   const initialCompileTriggeredRef = useRef(false);
+  const lastCompiledSourceRef = useRef<string>("");
+  const pendingHandoffRef = useRef<{
+    bullet: string | null;
+    source: string | null;
+    mode: string | null;
+  } | null>(null);
 
   // Accessible IDs
+  const resumeDocTabId = useId();
+  const coverDocTabId = useId();
   const mobileCodeTabId = useId();
   const mobilePdfTabId = useId();
   const mobileOrigTabId = useId();
   const templateSelectId = useId();
   const compilerSelectId = useId();
   const dialogTitleId = useId();
+
+  const activeTex = activeDoc === "resume" ? texSource : coverLetterTex;
+  const activeDocName = activeDoc === "resume" ? "main.tex" : "cover_letter.tex";
+  const texInsights = useMemo(() => extractTexInsights(activeTex), [activeTex]);
 
   // Revoke previous Blob URL on replace or unmount
   const updatePdfBlobUrl = useCallback((blob: Blob) => {
@@ -204,7 +266,7 @@ export default function LatexResumeEditorPage() {
   // Compile LaTeX -> Real TeX Live PDF
   const compileLatex = useCallback(
     async (sourceOverride?: string, engineOverride?: "pdflatex" | "xelatex" | "lualatex") => {
-      const targetTex = sourceOverride ?? texSource;
+      const targetTex = sourceOverride ?? (activeDoc === "resume" ? texSource : coverLetterTex);
       const targetCompiler = engineOverride ?? compiler;
       if (!targetTex.trim()) return;
 
@@ -239,6 +301,7 @@ export default function LatexResumeEditorPage() {
         const pdfBlob = await res.blob();
         if (mySeq !== compileSeqRef.current) return;
 
+        lastCompiledSourceRef.current = `${targetCompiler}:${targetTex}`;
         updatePdfBlobUrl(pdfBlob);
         setCompileError(null);
         setCompileDurationMs(Math.round(performance.now() - startedAt));
@@ -260,26 +323,42 @@ export default function LatexResumeEditorPage() {
         }
       }
     },
-    [texSource, compiler, updatePdfBlobUrl]
+    [activeDoc, texSource, coverLetterTex, compiler, updatePdfBlobUrl]
   );
 
-  // Hydrate initial .tex or convert uploaded resume -> Overleaf .tex on mount
+  // Hydrate initial .tex, preferred template, and cross-page handoffs on mount
   useEffect(() => {
     let cancelled = false;
+
+    if (pendingHandoffRef.current === null) {
+      const bullet = sessionStorage.getItem("pendingLatexBullet");
+      const source = sessionStorage.getItem("pendingLatexSource");
+      const mode = sessionStorage.getItem("pendingLatexMode");
+      pendingHandoffRef.current = { bullet, source, mode };
+      if (bullet) sessionStorage.removeItem("pendingLatexBullet");
+      if (source) sessionStorage.removeItem("pendingLatexSource");
+      if (mode) sessionStorage.removeItem("pendingLatexMode");
+    }
 
     const loadInitialProject = async () => {
       try {
         const cachedTex = sessionStorage.getItem("resumeLatexSource");
-        const cachedTpl = (sessionStorage.getItem("resumeLatexTemplate") as LatexTemplateId) || "jakes";
+        const cachedCoverTex = sessionStorage.getItem("coverLetterLatexSource");
+        const preferredTpl = resolvePreferredTemplate(sessionStorage.getItem("resumeLatexTemplate"));
         const cachedStructured = sessionStorage.getItem("resumeStructuredData");
         const cachedText = sessionStorage.getItem("resumeText");
         const cachedAiResult = sessionStorage.getItem("aiResult");
         const cachedPdfUrl = sessionStorage.getItem("uploadedPdfDataUrl");
 
-        setJobDescription(sessionStorage.getItem("jobDescription") || "");
-        setJobTitle(sessionStorage.getItem("jobTitle") || "");
-        setCompany(sessionStorage.getItem("company") || "");
-        setLocation(sessionStorage.getItem("location") || "");
+        const sessJd = sessionStorage.getItem("jobDescription") || "";
+        const sessTitle = sessionStorage.getItem("jobTitle") || "";
+        const sessCompany = sessionStorage.getItem("company") || "";
+        const sessLocation = sessionStorage.getItem("location") || "";
+
+        setJobDescription(sessJd);
+        setJobTitle(sessTitle);
+        setCompany(sessCompany);
+        setLocation(sessLocation);
 
         if (cachedPdfUrl) setUploadedPdfUrl(cachedPdfUrl);
         if (cachedText) setUploadedRawText(cachedText);
@@ -296,49 +375,26 @@ export default function LatexResumeEditorPage() {
           }
         }
 
+        let resolvedStructured: ResumeData = DEFAULT_RESUME_DATA;
         if (cachedStructured) {
           try {
-            setStructuredResume(JSON.parse(cachedStructured));
+            resolvedStructured = JSON.parse(cachedStructured) as ResumeData;
           } catch {
-            // ignore
+            // keep default
           }
         }
+
+        let resolvedTpl: LatexTemplateId = preferredTpl;
+        let baseTex = "";
 
         // Priority 1: Cached .tex source in session
         if (cachedTex && cachedTex.trim().length > 50) {
-          if (cancelled) return;
-          setTemplateId(cachedTpl);
-          setTexSource(cachedTex);
-          setIsLoadingInitial(false);
-          if (!initialCompileTriggeredRef.current) {
-            initialCompileTriggeredRef.current = true;
-            compileLatex(cachedTex);
-          }
-          return;
-        }
-
-        // Priority 2: Convert structured JSON in session -> Overleaf .tex
-        if (cachedStructured) {
-          try {
-            const parsedData = JSON.parse(cachedStructured) as ResumeData;
-            const generatedTex = generateLatexFromResumeData(parsedData, cachedTpl);
-            if (cancelled) return;
-            setStructuredResume(parsedData);
-            setTexSource(generatedTex);
-            sessionStorage.setItem("resumeLatexSource", generatedTex);
-            setIsLoadingInitial(false);
-            if (!initialCompileTriggeredRef.current) {
-              initialCompileTriggeredRef.current = true;
-              compileLatex(generatedTex);
-            }
-            return;
-          } catch {
-            // fall through
-          }
-        }
-
-        // Priority 3: Convert uploaded raw resume text -> JSON -> Overleaf .tex
-        if (cachedText) {
+          baseTex = cachedTex;
+        } else if (cachedStructured) {
+          // Priority 2: Convert structured JSON in session -> Overleaf .tex
+          baseTex = generateLatexFromResumeData(resolvedStructured, resolvedTpl);
+        } else if (cachedText) {
+          // Priority 3: Convert uploaded raw resume text -> JSON -> Overleaf .tex
           try {
             const res = await fetch("/api/build-resume", {
               method: "POST",
@@ -347,18 +403,9 @@ export default function LatexResumeEditorPage() {
             });
             if (res.ok) {
               const structured = (await res.json()) as ResumeData;
-              const generatedTex = generateLatexFromResumeData(structured, "jakes");
-              if (cancelled) return;
-              setStructuredResume(structured);
-              setTexSource(generatedTex);
+              resolvedStructured = structured;
+              baseTex = generateLatexFromResumeData(structured, resolvedTpl);
               sessionStorage.setItem("resumeStructuredData", JSON.stringify(structured));
-              sessionStorage.setItem("resumeLatexSource", generatedTex);
-              setIsLoadingInitial(false);
-              if (!initialCompileTriggeredRef.current) {
-                initialCompileTriggeredRef.current = true;
-                compileLatex(generatedTex);
-              }
-              return;
             }
           } catch (err) {
             console.warn("Could not build structured resume from text:", err);
@@ -366,41 +413,109 @@ export default function LatexResumeEditorPage() {
         }
 
         // Priority 4: Load saved project from Firestore
-        if (user) {
+        if (!baseTex && user) {
           try {
             const snap = await getDoc(doc(db, "users", user.uid, "data", "resume"));
             if (snap.exists()) {
               const data = snap.data();
-              if (data.structuredData) setStructuredResume(data.structuredData);
-              const resolvedTex =
-                typeof data.latexSource === "string" && data.latexSource.trim().length > 50
-                  ? data.latexSource
-                  : data.structuredData
-                    ? generateLatexFromResumeData(data.structuredData, "jakes")
-                    : generateLatexFromResumeData(DEFAULT_RESUME_DATA, "jakes");
-              if (cancelled) return;
-              setTexSource(resolvedTex);
-              sessionStorage.setItem("resumeLatexSource", resolvedTex);
-              setIsLoadingInitial(false);
-              if (!initialCompileTriggeredRef.current) {
-                initialCompileTriggeredRef.current = true;
-                compileLatex(resolvedTex);
+              if (data.structuredData) resolvedStructured = data.structuredData as ResumeData;
+              if (isValidLatexTemplateId(data.latexTemplate)) {
+                resolvedTpl = data.latexTemplate;
               }
-              return;
+              if (typeof data.latexSource === "string" && data.latexSource.trim().length > 50) {
+                baseTex = data.latexSource;
+              } else if (data.structuredData) {
+                baseTex = generateLatexFromResumeData(data.structuredData as ResumeData, resolvedTpl);
+              }
             }
           } catch (err) {
             console.warn("Firestore resume load note:", err);
           }
         }
 
-        // Priority 5: Starter Jake's Resume Overleaf template
-        const starterTex = generateLatexFromResumeData(DEFAULT_RESUME_DATA, "jakes");
+        // Priority 5: Starter Overleaf template respecting userPreferredLatexTemplate
+        if (!baseTex) {
+          baseTex = generateLatexFromResumeData(resolvedStructured, resolvedTpl);
+        }
+
+        // Apply cross-page handoffs (Enhancer bullet / Review export / CareerKit cover letter)
+        const handoff = pendingHandoffRef.current;
+        let openCoverLetterOnMount = false;
+        let resolvedCoverTex =
+          cachedCoverTex && cachedCoverTex.trim().length > 30
+            ? cachedCoverTex
+            : buildDefaultCoverLetter(resolvedStructured, sessCompany, sessTitle);
+        let noticeMessage: string | null = null;
+        let bulletApplied = false;
+
+        if (handoff?.source && handoff.mode !== "cover-letter") {
+          const src = handoff.source.trim();
+          if (src.includes("\\documentclass") || src.includes("\\begin{document}")) {
+            baseTex = src;
+            bulletApplied = true;
+            noticeMessage = "Loaded exported LaTeX source into main.tex";
+          } else if (src.length > 30) {
+            try {
+              const res = await fetch("/api/build-resume", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ resumeText: src }),
+              });
+              if (res.ok) {
+                const structured = (await res.json()) as ResumeData;
+                resolvedStructured = structured;
+                baseTex = generateLatexFromResumeData(structured, resolvedTpl);
+                sessionStorage.setItem("resumeStructuredData", JSON.stringify(structured));
+                noticeMessage = "Converted exported resume text into Overleaf main.tex";
+              }
+            } catch (err) {
+              console.warn("Could not convert pendingLatexSource:", err);
+            }
+          }
+        }
+
+        if (handoff?.bullet && handoff.bullet.trim()) {
+          const { updated } = applyBulletUpgradeToTex(baseTex, "", handoff.bullet.trim());
+          baseTex = updated;
+          bulletApplied = true;
+          noticeMessage = "Inserted upgraded bullet from AI Enhancer into main.tex";
+        }
+
+        if (handoff?.source && handoff.mode === "cover-letter") {
+          const clSrc = handoff.source.trim();
+          resolvedCoverTex =
+            clSrc.includes("\\documentclass") || clSrc.includes("\\begin{document}")
+              ? clSrc
+              : generateCoverLetterLatex({
+                  candidateName: resolvedStructured.personalInfo?.name || "Your Name",
+                  email: resolvedStructured.personalInfo?.email,
+                  phone: resolvedStructured.personalInfo?.phone,
+                  location: resolvedStructured.personalInfo?.location,
+                  company: sessCompany,
+                  jobTitle: sessTitle,
+                  paragraphs: clSrc.split(/\n{2,}/).filter(Boolean),
+                });
+          openCoverLetterOnMount = true;
+          sessionStorage.setItem("coverLetterLatexSource", resolvedCoverTex);
+          noticeMessage = "Loaded tailored Cover Letter into cover_letter.tex";
+        }
+
         if (cancelled) return;
-        setTexSource(starterTex);
+
+        setTemplateId(resolvedTpl);
+        setStructuredResume(resolvedStructured);
+        setTexSource(baseTex);
+        setCoverLetterTex(resolvedCoverTex);
+        sessionStorage.setItem("resumeLatexSource", baseTex);
+        sessionStorage.setItem("resumeLatexTemplate", resolvedTpl);
+        if (bulletApplied) setHasManualEdits(true);
+        if (noticeMessage) setHandoffNotice(noticeMessage);
+        if (openCoverLetterOnMount) setActiveDoc("cover-letter");
+
         setIsLoadingInitial(false);
         if (!initialCompileTriggeredRef.current) {
           initialCompileTriggeredRef.current = true;
-          compileLatex(starterTex);
+          compileLatex(openCoverLetterOnMount ? resolvedCoverTex : baseTex);
         }
       } finally {
         if (!cancelled) setIsLoadingInitial(false);
@@ -415,22 +530,51 @@ export default function LatexResumeEditorPage() {
 
   // Debounced auto-compile on user source edits
   useEffect(() => {
-    if (isLoadingInitial || !autoCompile || !hasManualEdits) return;
+    if (isLoadingInitial || !autoCompile) return;
+    const isDirty = activeDoc === "resume" ? hasManualEdits : hasManualCoverEdits;
+    if (!isDirty) return;
+
+    const targetTex = activeDoc === "resume" ? texSource : coverLetterTex;
+    if (`${compiler}:${targetTex}` === lastCompiledSourceRef.current) return;
+
     const timer = setTimeout(() => {
-      compileLatex(texSource, compiler);
+      compileLatex(targetTex, compiler);
     }, 1500);
     return () => clearTimeout(timer);
-  }, [texSource, compiler, autoCompile, hasManualEdits, isLoadingInitial, compileLatex]);
+  }, [
+    activeDoc,
+    texSource,
+    coverLetterTex,
+    compiler,
+    autoCompile,
+    hasManualEdits,
+    hasManualCoverEdits,
+    isLoadingInitial,
+    compileLatex,
+  ]);
+
+  // Switch between main.tex & cover_letter.tex
+  const handleSwitchDoc = (nextDoc: "resume" | "cover-letter") => {
+    if (nextDoc === activeDoc) return;
+    setActiveDoc(nextDoc);
+    const nextTex = nextDoc === "resume" ? texSource : coverLetterTex;
+    compileLatex(nextTex, compiler);
+  };
 
   // Save .tex to sessionStorage & Firestore
-  const handleSaveProject = async (texOverride?: string) => {
-    const content = texOverride ?? texSource;
-    sessionStorage.setItem("resumeLatexSource", content);
-    sessionStorage.setItem("resumeLatexTemplate", templateId);
+  const handleSaveProject = async (texOverride?: string, targetDoc = activeDoc) => {
+    const content = texOverride ?? (targetDoc === "resume" ? texSource : coverLetterTex);
+    if (targetDoc === "resume") {
+      sessionStorage.setItem("resumeLatexSource", content);
+      sessionStorage.setItem("resumeLatexTemplate", templateId);
+    } else {
+      sessionStorage.setItem("coverLetterLatexSource", content);
+    }
+
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2000);
 
-    if (user) {
+    if (user && targetDoc === "resume") {
       try {
         await setDoc(
           doc(db, "users", user.uid, "data", "resume"),
@@ -453,13 +597,14 @@ export default function LatexResumeEditorPage() {
     setTemplateId(nextTpl);
     setTexSource(nextTex);
     setHasManualEdits(false);
+    setActiveDoc("resume");
     sessionStorage.setItem("resumeLatexSource", nextTex);
     sessionStorage.setItem("resumeLatexTemplate", nextTpl);
     compileLatex(nextTex, compiler);
   };
 
   const handleTemplateSelectChange = (nextTpl: LatexTemplateId) => {
-    if (nextTpl === templateId) return;
+    if (nextTpl === templateId && activeDoc === "resume") return;
     if (hasManualEdits) {
       setPendingTemplate(nextTpl);
       confirmDialogRef.current?.showModal();
@@ -468,17 +613,59 @@ export default function LatexResumeEditorPage() {
     }
   };
 
+  // Apply Guided Visual Form changes -> main.tex
+  const handleApplyQuickForm = async (
+    updatedData: ResumeData,
+    selectedTpl: LatexTemplateId
+  ) => {
+    const nextTex = generateLatexFromResumeData(updatedData, selectedTpl);
+    setStructuredResume(updatedData);
+    setTemplateId(selectedTpl);
+    setTexSource(nextTex);
+    setHasManualEdits(false);
+    setActiveDoc("resume");
+    sessionStorage.setItem("resumeStructuredData", JSON.stringify(updatedData));
+    sessionStorage.setItem("resumeLatexSource", nextTex);
+    sessionStorage.setItem("resumeLatexTemplate", selectedTpl);
+    setHandoffNotice("Applied Guided Form updates cleanly to main.tex");
+
+    if (user) {
+      try {
+        await setDoc(
+          doc(db, "users", user.uid, "data", "resume"),
+          {
+            structuredData: updatedData,
+            latexSource: nextTex,
+            latexTemplate: selectedTpl,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      } catch (err) {
+        console.warn("Failed to persist structured resume to Firestore:", err);
+      }
+    }
+
+    compileLatex(nextTex, compiler);
+  };
+
   // Upload a PDF/DOCX/TEX file directly inside Overleaf IDE
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Support direct .tex file upload!
+    // Support direct .tex file upload
     if (file.name.toLowerCase().endsWith(".tex")) {
       const texText = await file.text();
-      setTexSource(texText);
-      setHasManualEdits(true);
-      sessionStorage.setItem("resumeLatexSource", texText);
+      if (activeDoc === "cover-letter") {
+        setCoverLetterTex(texText);
+        setHasManualCoverEdits(true);
+        sessionStorage.setItem("coverLetterLatexSource", texText);
+      } else {
+        setTexSource(texText);
+        setHasManualEdits(true);
+        sessionStorage.setItem("resumeLatexSource", texText);
+      }
       compileLatex(texText, compiler);
       return;
     }
@@ -519,6 +706,7 @@ export default function LatexResumeEditorPage() {
         setStructuredResume(structured);
         setTexSource(generatedTex);
         setHasManualEdits(false);
+        setActiveDoc("resume");
         sessionStorage.setItem("resumeStructuredData", JSON.stringify(structured));
         sessionStorage.setItem("resumeLatexSource", generatedTex);
         compileLatex(generatedTex, compiler);
@@ -541,7 +729,10 @@ export default function LatexResumeEditorPage() {
     const a = document.createElement("a");
     a.href = pdfUrl;
     const cleanName = (structuredResume.personalInfo?.name || "Resume").replace(/\s+/g, "_");
-    a.download = `${cleanName}_LaTeX.pdf`;
+    a.download =
+      activeDoc === "cover-letter"
+        ? `${cleanName}_Cover_Letter.pdf`
+        : `${cleanName}_LaTeX.pdf`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -549,12 +740,13 @@ export default function LatexResumeEditorPage() {
 
   // Download .tex Source (Overleaf-compatible)
   const handleDownloadTex = () => {
-    const blob = new Blob([texSource], { type: "application/x-tex;charset=utf-8" });
+    const blob = new Blob([activeTex], { type: "application/x-tex;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     const cleanName = (structuredResume.personalInfo?.name || "main").replace(/\s+/g, "_");
-    a.download = `${cleanName}.tex`;
+    a.download =
+      activeDoc === "cover-letter" ? `${cleanName}_cover_letter.tex` : `${cleanName}.tex`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -571,16 +763,21 @@ export default function LatexResumeEditorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: "fix-error",
-          tex: texSource,
+          tex: activeTex,
           errorLog: compileError.log || compileError.message,
           errorLine: compileError.line,
         }),
       });
       const data = await res.json();
       if (res.ok && typeof data.fixedTex === "string" && data.fixedTex.trim().length > 20) {
-        setTexSource(data.fixedTex);
-        setHasManualEdits(true);
-        handleSaveProject(data.fixedTex);
+        if (activeDoc === "resume") {
+          setTexSource(data.fixedTex);
+          setHasManualEdits(true);
+        } else {
+          setCoverLetterTex(data.fixedTex);
+          setHasManualCoverEdits(true);
+        }
+        handleSaveProject(data.fixedTex, activeDoc);
         await compileLatex(data.fixedTex, compiler);
       }
     } catch (err) {
@@ -611,8 +808,9 @@ export default function LatexResumeEditorPage() {
       if (res.ok && typeof data.updatedTex === "string" && data.updatedTex.trim().length > 50) {
         setTexSource(data.updatedTex);
         setHasManualEdits(true);
+        setActiveDoc("resume");
         if (Array.isArray(data.changesSummary)) setTailorSummary(data.changesSummary);
-        handleSaveProject(data.updatedTex);
+        handleSaveProject(data.updatedTex, "resume");
         await compileLatex(data.updatedTex, compiler);
       }
     } catch (err) {
@@ -627,8 +825,9 @@ export default function LatexResumeEditorPage() {
     const { updated } = applyBulletUpgradeToTex(texSource, sug.original, sug.improved);
     setTexSource(updated);
     setHasManualEdits(true);
+    setActiveDoc("resume");
     setAppliedSuggestionIds((prev) => new Set(prev).add(idx));
-    handleSaveProject(updated);
+    handleSaveProject(updated, "resume");
     compileLatex(updated, compiler);
   };
 
@@ -637,7 +836,8 @@ export default function LatexResumeEditorPage() {
     if (added) {
       setTexSource(updated);
       setHasManualEdits(true);
-      handleSaveProject(updated);
+      setActiveDoc("resume");
+      handleSaveProject(updated, "resume");
       compileLatex(updated, compiler);
     }
     setMissingKeywords((prev) => prev.filter((item) => item !== kw));
@@ -645,8 +845,43 @@ export default function LatexResumeEditorPage() {
 
   const handleInsertBulletSnippet = (plainBullet: string) => {
     const snippet = `\n        ${formatAsResumeItem(plainBullet)}`;
-    editorRef.current?.insertAtCursor(snippet);
+    if (activeDoc !== "resume") {
+      setActiveDoc("resume");
+      setTimeout(() => editorRef.current?.insertAtCursor(snippet), 50);
+    } else {
+      editorRef.current?.insertAtCursor(snippet);
+    }
     setHasManualEdits(true);
+  };
+
+  const handleInsertTexSnippet = (rawTexSnippet: string) => {
+    if (activeDoc !== "resume") {
+      setActiveDoc("resume");
+      setTimeout(() => editorRef.current?.insertAtCursor(rawTexSnippet), 50);
+    } else {
+      editorRef.current?.insertAtCursor(rawTexSnippet);
+    }
+    setHasManualEdits(true);
+  };
+
+  const handleLoadCoverLetterTex = (
+    nextCoverTex: string,
+    meta?: { company?: string; jobTitle?: string }
+  ) => {
+    if (meta?.company) {
+      setCompany(meta.company);
+      sessionStorage.setItem("company", meta.company);
+    }
+    if (meta?.jobTitle) {
+      setJobTitle(meta.jobTitle);
+      sessionStorage.setItem("jobTitle", meta.jobTitle);
+    }
+    setCoverLetterTex(nextCoverTex);
+    setHasManualCoverEdits(false);
+    sessionStorage.setItem("coverLetterLatexSource", nextCoverTex);
+    setActiveDoc("cover-letter");
+    setHandoffNotice("Loaded Overleaf cover letter into cover_letter.tex");
+    compileLatex(nextCoverTex, compiler);
   };
 
   if (isLoadingInitial) {
@@ -664,20 +899,65 @@ export default function LatexResumeEditorPage() {
     <div className="flex flex-col h-[calc(100dvh-4rem)] w-full min-w-0 bg-background text-foreground overflow-hidden">
       {/* ── Overleaf Top IDE Toolbar ── */}
       <header className="flex flex-wrap items-center justify-between gap-2 px-3 md:px-4 py-2 bg-card border-b border-border shrink-0 z-20">
-        {/* Left: File Breadcrumb + Template & Compiler Controls */}
+        {/* Left: File Switcher Tabs + Guided Form + Template & Compiler Controls */}
         <div className="flex flex-wrap items-center gap-2 min-w-0">
-          <div className="hidden xl:flex items-center gap-1.5 text-xs text-muted-foreground mr-1">
+          <div className="hidden 2xl:flex items-center gap-1.5 text-xs text-muted-foreground mr-1">
             <Link href="/dashboard" className="hover:text-foreground transition-colors">
               Dashboard
             </Link>
             <ChevronRight className="w-3 h-3" />
-            <span className="font-bold text-foreground flex items-center gap-1">
-              <FileCode2 className="w-3.5 h-3.5 text-emerald-500" />
-              <span>main.tex</span>
-            </span>
           </div>
 
-          {/* Template Switcher */}
+          {/* Document File Tabs: main.tex vs cover_letter.tex */}
+          <div
+            role="tablist"
+            aria-label="Active LaTeX Document"
+            className="inline-flex items-center p-0.5 rounded-lg bg-muted border border-border"
+          >
+            <button
+              type="button"
+              id={resumeDocTabId}
+              role="tab"
+              aria-selected={activeDoc === "resume"}
+              onClick={() => handleSwitchDoc("resume")}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                activeDoc === "resume"
+                  ? "bg-card text-foreground shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <FileCode2 className="w-3.5 h-3.5 text-emerald-500" />
+              <span>main.tex</span>
+            </button>
+            <button
+              type="button"
+              id={coverDocTabId}
+              role="tab"
+              aria-selected={activeDoc === "cover-letter"}
+              onClick={() => handleSwitchDoc("cover-letter")}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                activeDoc === "cover-letter"
+                  ? "bg-card text-foreground shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Mail className="w-3.5 h-3.5 text-blue-500" />
+              <span>cover_letter.tex</span>
+            </button>
+          </div>
+
+          {/* Customer-Friendly Guided Form Button */}
+          <button
+            type="button"
+            onClick={() => setShowQuickForm(true)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold transition-colors cursor-pointer"
+            title="Edit resume visually without memorizing LaTeX"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>Guided Form</span>
+          </button>
+
+          {/* Template Switcher (6 ATS-Verified Templates) */}
           <div className="flex items-center gap-1.5 min-w-0">
             <label htmlFor={templateSelectId} className="sr-only">
               Overleaf Resume Template
@@ -686,7 +966,7 @@ export default function LatexResumeEditorPage() {
               id={templateSelectId}
               value={templateId}
               onChange={(e) => handleTemplateSelectChange(e.target.value as LatexTemplateId)}
-              className="px-2.5 py-1.5 rounded-lg bg-background border border-border text-xs font-semibold text-foreground cursor-pointer max-w-[190px] truncate"
+              className="px-2.5 py-1.5 rounded-lg bg-background border border-border text-xs font-semibold text-foreground cursor-pointer max-w-[195px] truncate"
             >
               {LATEX_TEMPLATES.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -704,7 +984,7 @@ export default function LatexResumeEditorPage() {
               onChange={(e) => {
                 const nextComp = e.target.value as "pdflatex" | "xelatex" | "lualatex";
                 setCompiler(nextComp);
-                compileLatex(texSource, nextComp);
+                compileLatex(activeTex, nextComp);
               }}
               className="hidden sm:block px-2 py-1.5 rounded-lg bg-background border border-border text-xs font-mono font-medium text-muted-foreground cursor-pointer"
             >
@@ -717,10 +997,10 @@ export default function LatexResumeEditorPage() {
           {/* Overleaf Primary Recompile Button */}
           <button
             type="button"
-            onClick={() => compileLatex(texSource, compiler)}
+            onClick={() => compileLatex(activeTex, compiler)}
             disabled={isCompiling}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-70 shadow-2xs"
-            title="Recompile main.tex to PDF (Ctrl/Cmd + S)"
+            title={`Recompile ${activeDocName} to PDF (Ctrl/Cmd + S)`}
           >
             {isCompiling ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -731,7 +1011,7 @@ export default function LatexResumeEditorPage() {
           </button>
 
           {/* Auto-Compile Toggle */}
-          <label className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground cursor-pointer select-none px-1.5">
+          <label className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground cursor-pointer select-none px-1">
             <input
               type="checkbox"
               checked={autoCompile}
@@ -742,8 +1022,40 @@ export default function LatexResumeEditorPage() {
           </label>
         </div>
 
-        {/* Right: Actions (Import, Original Split, AI Copilot, Save, Export .tex) */}
+        {/* Right: Live HUD Insights + Actions */}
         <div className="flex flex-wrap items-center gap-1.5">
+          {/* Live Tex Insights HUD Badge */}
+          <div
+            aria-label={`Document insights: ${texInsights.wordCount} words, ${texInsights.bulletCount} bullets, ${texInsights.sectionCount} sections, estimated ${texInsights.estimatedPages} pages`}
+            className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground"
+          >
+            <span>{texInsights.wordCount}w</span>
+            <span aria-hidden="true">·</span>
+            <span>{texInsights.bulletCount} bullets</span>
+            <span aria-hidden="true">·</span>
+            <span>{texInsights.sectionCount} sec</span>
+            <span aria-hidden="true">·</span>
+            <span className="font-semibold text-foreground">~{texInsights.estimatedPages} pg</span>
+          </div>
+
+          {texInsights.missingEscapeWarnings.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                const firstWarn = texInsights.missingEscapeWarnings[0];
+                setMobilePane("code");
+                setTimeout(() => editorRef.current?.goToLine(firstWarn.line), 50);
+              }}
+              title={`Unescaped "${texInsights.missingEscapeWarnings[0].char}" on line ${texInsights.missingEscapeWarnings[0].line} — click to jump`}
+              className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg border border-amber-500/35 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[11px] font-semibold cursor-pointer transition-colors"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">
+                Unescaped {texInsights.missingEscapeWarnings[0].char} (L{texInsights.missingEscapeWarnings[0].line})
+              </span>
+            </button>
+          )}
+
           <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-background hover:bg-muted text-xs font-semibold text-foreground cursor-pointer transition-colors">
             <UploadCloud className="w-3.5 h-3.5 text-primary" />
             <span className="hidden lg:inline">Import PDF / .tex</span>
@@ -810,13 +1122,35 @@ export default function LatexResumeEditorPage() {
             type="button"
             onClick={handleDownloadTex}
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border bg-background hover:bg-muted text-xs font-semibold text-foreground cursor-pointer transition-colors"
-            title="Download .tex source file for Overleaf"
+            title={`Download ${activeDocName} source file for Overleaf`}
           >
             <Download className="w-3.5 h-3.5 text-muted-foreground" />
             <span>.tex</span>
           </button>
         </div>
       </header>
+
+      {/* Subtle Cross-Page Handoff Banner */}
+      {handoffNotice && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex items-center justify-between gap-2 px-4 py-1.5 bg-emerald-500/10 border-b border-emerald-500/25 text-xs text-emerald-700 dark:text-emerald-300 shrink-0"
+        >
+          <span className="flex items-center gap-1.5 font-medium truncate">
+            <Sparkles className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{handoffNotice}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setHandoffNotice(null)}
+            aria-label="Dismiss notification"
+            className="p-0.5 rounded hover:bg-emerald-500/20 cursor-pointer shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* ── Mobile Pane Switcher (< lg screens) ── */}
       <div
@@ -837,7 +1171,7 @@ export default function LatexResumeEditorPage() {
           }`}
         >
           <Code2 className="w-3.5 h-3.5" />
-          <span>main.tex Code</span>
+          <span>{activeDocName} Code</span>
         </button>
         <button
           type="button"
@@ -929,90 +1263,152 @@ export default function LatexResumeEditorPage() {
         >
           {/* Quick LaTeX Snippet Insertion Bar */}
           <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-muted/40 border-b border-border overflow-x-auto latex-scroller shrink-0">
-            <div className="flex items-center gap-1 text-[11px]">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mr-1 shrink-0">
-                Insert:
-              </span>
-              <button
-                type="button"
-                onClick={() =>
-                  editorRef.current?.insertAtCursor("\n\\section{Section Title}\n  \\resumeSubHeadingListStart\n\n  \\resumeSubHeadingListEnd\n")
-                }
-                className="px-2 py-0.5 rounded bg-background hover:bg-muted border border-border font-mono text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
-              >
-                + \section
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  editorRef.current?.insertAtCursor(
-                    "\n    \\resumeSubheading\n      {Role / Title}{Month Year -- Present}\n      {Company Name}{City, State}\n      \\resumeItemListStart\n        \\resumeItem{Accomplished [X] as measured by [Y] by doing [Z].}\n      \\resumeItemListEnd\n"
-                  )
-                }
-                className="px-2 py-0.5 rounded bg-background hover:bg-muted border border-border font-mono text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
-              >
-                + Job Entry
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  editorRef.current?.insertAtCursor(
-                    "\n        \\resumeItem{Engineered high-throughput feature cutting latency by 35\\%.}"
-                  )
-                }
-                className="px-2 py-0.5 rounded bg-background hover:bg-muted border border-border font-mono text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
-              >
-                + \resumeItem
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  editorRef.current?.insertAtCursor(
-                    "\n    \\resumeProjectHeading\n      {\\textbf{Project Name} $|$ \\emph{Tech Stack}}{2025}\n      \\resumeItemListStart\n        \\resumeItem{Built scalable system handling 10k+ requests/min.}\n      \\resumeItemListEnd\n"
-                  )
-                }
-                className="px-2 py-0.5 rounded bg-background hover:bg-muted border border-border font-mono text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
-              >
-                + Project
-              </button>
-              <button
-                type="button"
-                onClick={() => editorRef.current?.insertAtCursor("\\textbf{Bold Text}")}
-                className="px-2 py-0.5 rounded bg-background hover:bg-muted border border-border font-mono text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
-              >
-                \textbf
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  editorRef.current?.insertAtCursor("\\href{https://example.com}{\\underline{Link Text}}")
-                }
-                className="px-2 py-0.5 rounded bg-background hover:bg-muted border border-border font-mono text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
-              >
-                \href
-              </button>
-            </div>
+            {activeDoc === "resume" ? (
+              <>
+                <div className="flex items-center gap-1 text-[11px]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mr-1 shrink-0">
+                    Insert:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      editorRef.current?.insertAtCursor(
+                        "\n\\section{Section Title}\n  \\resumeSubHeadingListStart\n\n  \\resumeSubHeadingListEnd\n"
+                      )
+                    }
+                    className="px-2 py-0.5 rounded bg-background hover:bg-muted border border-border font-mono text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
+                  >
+                    + \section
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      editorRef.current?.insertAtCursor(
+                        "\n    \\resumeSubheading\n      {Role / Title}{Month Year -- Present}\n      {Company Name}{City, State}\n      \\resumeItemListStart\n        \\resumeItem{Accomplished [X] as measured by [Y] by doing [Z].}\n      \\resumeItemListEnd\n"
+                      )
+                    }
+                    className="px-2 py-0.5 rounded bg-background hover:bg-muted border border-border font-mono text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
+                  >
+                    + Job Entry
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      editorRef.current?.insertAtCursor(
+                        "\n        \\resumeItem{Engineered high-throughput feature cutting latency by 35\\%.}"
+                      )
+                    }
+                    className="px-2 py-0.5 rounded bg-background hover:bg-muted border border-border font-mono text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
+                  >
+                    + \resumeItem
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      editorRef.current?.insertAtCursor(
+                        "\n    \\resumeProjectHeading\n      {\\textbf{Project Name} $|$ \\emph{Tech Stack}}{2025}\n      \\resumeItemListStart\n        \\resumeItem{Built scalable system handling 10k+ requests/min.}\n      \\resumeItemListEnd\n"
+                      )
+                    }
+                    className="px-2 py-0.5 rounded bg-background hover:bg-muted border border-border font-mono text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
+                  >
+                    + Project
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => editorRef.current?.insertAtCursor("\\textbf{Bold Text}")}
+                    className="px-2 py-0.5 rounded bg-background hover:bg-muted border border-border font-mono text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
+                  >
+                    \textbf
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      editorRef.current?.insertAtCursor("\\href{https://example.com}{\\underline{Link Text}}")
+                    }
+                    className="px-2 py-0.5 rounded bg-background hover:bg-muted border border-border font-mono text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
+                  >
+                    \href
+                  </button>
+                </div>
 
-            <button
-              type="button"
-              onClick={() => applyTemplateSwitch(templateId)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 cursor-pointer transition-colors"
-              title="Regenerate clean LaTeX from structured data"
-            >
-              <RefreshCw className="w-3 h-3" />
-              <span className="hidden sm:inline">Reset TeX</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={() => applyTemplateSwitch(templateId)}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 cursor-pointer transition-colors"
+                  title="Regenerate clean LaTeX from structured data"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span className="hidden sm:inline">Reset TeX</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-1 text-[11px]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mr-1 shrink-0">
+                    Letter:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      editorRef.current?.insertAtCursor(
+                        "\n\\vspace{8pt}\n\nNew tailored paragraph highlighting relevant metrics and enthusiasm for the role.\n"
+                      )
+                    }
+                    className="px-2 py-0.5 rounded bg-background hover:bg-muted border border-border font-mono text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
+                  >
+                    + Paragraph
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => editorRef.current?.insertAtCursor("\\textbf{Bold Text}")}
+                    className="px-2 py-0.5 rounded bg-background hover:bg-muted border border-border font-mono text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
+                  >
+                    \textbf
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      editorRef.current?.insertAtCursor("\\href{https://example.com}{\\underline{Link Text}}")
+                    }
+                    className="px-2 py-0.5 rounded bg-background hover:bg-muted border border-border font-mono text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
+                  >
+                    \href
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const resetCl = buildDefaultCoverLetter(structuredResume, company, jobTitle);
+                    setCoverLetterTex(resetCl);
+                    setHasManualCoverEdits(false);
+                    sessionStorage.setItem("coverLetterLatexSource", resetCl);
+                    compileLatex(resetCl, compiler);
+                  }}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 cursor-pointer transition-colors"
+                  title="Reset cover_letter.tex to clean template"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span className="hidden sm:inline">Reset Letter</span>
+                </button>
+              </>
+            )}
           </div>
 
           {/* CodeMirror 6 Syntax-Highlighted Editor */}
           <LatexCodeEditor
             ref={editorRef}
-            value={texSource}
+            value={activeTex}
             onChange={(val) => {
-              setTexSource(val);
-              setHasManualEdits(true);
+              if (activeDoc === "resume") {
+                setTexSource(val);
+                setHasManualEdits(true);
+              } else {
+                setCoverLetterTex(val);
+                setHasManualCoverEdits(true);
+              }
             }}
-            onCompileShortcut={() => compileLatex(texSource, compiler)}
+            onCompileShortcut={() => compileLatex(activeTex, compiler)}
           />
         </section>
 
@@ -1030,7 +1426,7 @@ export default function LatexResumeEditorPage() {
             lastCompiledAt={lastCompiledAt}
             compilerBackend={compilerBackend}
             compileDurationMs={compileDurationMs}
-            onRecompile={() => compileLatex(texSource, compiler)}
+            onRecompile={() => compileLatex(activeTex, compiler)}
             onDownloadPdf={handleDownloadPdf}
             onJumpToLine={(lineNum) => {
               setMobilePane("code");
@@ -1038,10 +1434,12 @@ export default function LatexResumeEditorPage() {
             }}
             onAiFixError={handleAiFixError}
             isFixingError={isFixingError}
+            activeDocName={activeDocName}
+            texInsights={texInsights}
           />
         </section>
 
-        {/* Optional Pane 3: AI Copilot Right Sidebar */}
+        {/* Optional Pane 3: AI Copilot Right Sidebar (AI Polish, JD, GitHub Sync, Cover Letter) */}
         {showAiSidebar && (
           <AiLatexSidebar
             onClose={() => setShowAiSidebar(false)}
@@ -1059,12 +1457,36 @@ export default function LatexResumeEditorPage() {
             missingKeywords={missingKeywords}
             onAddKeywordToSkills={handleAddKeywordToSkills}
             onInsertBulletSnippet={handleInsertBulletSnippet}
+            onInsertTexSnippet={handleInsertTexSnippet}
             onTailorFullTex={handleTailorFullTex}
             isTailoringTex={isTailoringTex}
             tailorSummary={tailorSummary}
+            structuredResume={structuredResume}
+            resumePlainText={uploadedRawText}
+            onLoadCoverLetterTex={handleLoadCoverLetterTex}
+            onJobMetaChange={(meta) => {
+              if (meta.company !== undefined) {
+                setCompany(meta.company);
+                sessionStorage.setItem("company", meta.company);
+              }
+              if (meta.jobTitle !== undefined) {
+                setJobTitle(meta.jobTitle);
+                sessionStorage.setItem("jobTitle", meta.jobTitle);
+              }
+            }}
           />
         )}
       </div>
+
+      {/* Customer-Friendly Guided Visual Builder Drawer */}
+      {showQuickForm && (
+        <QuickFormDrawer
+          onClose={() => setShowQuickForm(false)}
+          resumeData={structuredResume}
+          templateId={templateId}
+          onApplyToMainTex={handleApplyQuickForm}
+        />
+      )}
 
       {/* ── Accessible Native <dialog> Confirmation Before Overwriting Custom .tex Edits ── */}
       <dialog
