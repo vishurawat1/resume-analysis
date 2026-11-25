@@ -45,7 +45,7 @@ export default function DashboardLayout({
     );
   }
 
-  if (!user) {
+  if (!user || !auth.currentUser || user.uid !== auth.currentUser.uid) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center space-y-4">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />
@@ -55,7 +55,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div key={user.uid} className="flex min-h-screen bg-background">
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}

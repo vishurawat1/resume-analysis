@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, User, signOut as firebaseSignOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { syncAuthSessionIsolation } from "@/lib/userStorage";
 
 interface AuthContextType {
   user: User | null;
@@ -27,6 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof auth.authStateReady === "function") {
       auth.authStateReady().then(() => {
         if (isMounted) {
+          syncAuthSessionIsolation(auth.currentUser?.uid ?? null);
           setUser(auth.currentUser);
           setLoading(false);
         }
@@ -37,12 +39,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       auth,
       (currentUser) => {
         if (isMounted) {
+          syncAuthSessionIsolation(currentUser?.uid ?? null);
           setUser(currentUser);
           setLoading(false);
         }
       },
       () => {
         if (isMounted) {
+          syncAuthSessionIsolation(null);
           setLoading(false);
         }
       }
@@ -55,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    syncAuthSessionIsolation(null);
     await firebaseSignOut(auth);
     setUser(null);
   };

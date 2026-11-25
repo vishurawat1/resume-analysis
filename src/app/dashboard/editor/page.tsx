@@ -43,6 +43,7 @@ import type { LatexCodeEditorHandle } from "@/components/editor/LatexCodeEditor"
 import { CompileErrorInfo, PdfPreviewPane } from "@/components/editor/PdfPreviewPane";
 import { AiLatexSidebar } from "@/components/editor/AiLatexSidebar";
 import { QuickFormDrawer } from "@/components/editor/QuickFormDrawer";
+import { getUserPref } from "@/lib/userStorage";
 
 const LatexCodeEditor = dynamic(
   () => import("@/components/editor/LatexCodeEditor").then((mod) => mod.LatexCodeEditor),
@@ -153,9 +154,9 @@ function buildDefaultCoverLetter(data: ResumeData, company?: string, jobTitle?: 
   });
 }
 
-function resolvePreferredTemplate(preferSettingsFirst = false): LatexTemplateId {
+function resolvePreferredTemplate(preferSettingsFirst = false, uid?: string | null): LatexTemplateId {
   if (typeof window !== "undefined") {
-    const pref = localStorage.getItem("userPreferredLatexTemplate");
+    const pref = getUserPref("userPreferredLatexTemplate", uid);
     const sess = sessionStorage.getItem("resumeLatexTemplate");
     if (preferSettingsFirst) {
       if (isValidLatexTemplateId(pref)) return pref;
@@ -356,7 +357,7 @@ export default function LatexResumeEditorPage() {
         const cachedTex = sessionStorage.getItem("resumeLatexSource");
         const cachedCoverTex = sessionStorage.getItem("coverLetterLatexSource");
         const hasCachedTex = Boolean(cachedTex && cachedTex.trim().length > 50);
-        const preferredTpl = resolvePreferredTemplate(!hasCachedTex);
+        const preferredTpl = resolvePreferredTemplate(!hasCachedTex, user?.uid);
         const cachedStructured = sessionStorage.getItem("resumeStructuredData");
         const cachedText = sessionStorage.getItem("resumeText");
         const cachedAiResult = sessionStorage.getItem("aiResult");

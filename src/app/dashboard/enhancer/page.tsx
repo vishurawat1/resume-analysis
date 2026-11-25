@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { getUserPref, setUserPref } from "@/lib/userStorage";
 
 interface EnhancedOption {
   text: string;
@@ -110,14 +111,8 @@ export default function EnhancerPage() {
       await Promise.resolve();
       if (cancelled) return;
 
-      const storedTrack =
-        localStorage.getItem("userTargetTrack") ||
-        sessionStorage.getItem("userTargetTrack") ||
-        "";
-      const storedGithub =
-        localStorage.getItem("userGithubUsername") ||
-        sessionStorage.getItem("userGithubUsername") ||
-        "";
+      const storedTrack = getUserPref("userTargetTrack", user?.uid);
+      const storedGithub = getUserPref("userGithubUsername", user?.uid);
 
       if (storedTrack) setTrack(storedTrack);
       if (storedGithub) setGithubUsername(storedGithub);
@@ -129,11 +124,11 @@ export default function EnhancerPage() {
             const data = snap.data();
             if (!storedTrack && data?.targetTrack) {
               setTrack(data.targetTrack);
-              localStorage.setItem("userTargetTrack", data.targetTrack);
+              setUserPref("userTargetTrack", data.targetTrack, user.uid);
             }
             if (!storedGithub && data?.githubUsername) {
               setGithubUsername(data.githubUsername);
-              localStorage.setItem("userGithubUsername", data.githubUsername);
+              setUserPref("userGithubUsername", data.githubUsername, user.uid);
             }
           }
         } catch {

@@ -25,6 +25,7 @@ import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { cn } from "@/lib/utils";
+import { getUserLocalItem, getUserPref, setUserPref } from "@/lib/userStorage";
 
 interface ResumeData {
   fileName?: string;
@@ -61,16 +62,16 @@ export default function DashboardHome() {
       await Promise.resolve();
       if (cancelled) return;
 
-      let localHome = localStorage.getItem("userHomeLocation") || "";
-      let localTrack = localStorage.getItem("userTargetTrack") || "";
-      let localGithub = localStorage.getItem("userGithubUsername") || "";
+      let localHome = getUserPref("userHomeLocation", user?.uid);
+      let localTrack = getUserPref("userTargetTrack", user?.uid);
+      let localGithub = getUserPref("userGithubUsername", user?.uid);
 
       const sessionResume = Boolean(sessionStorage.getItem("resumeText"));
       const hasCachedAi = Boolean(sessionStorage.getItem("aiResult"));
       const hasLatex = Boolean(sessionStorage.getItem("resumeLatexSource"));
       let hasScanHistory = false;
       try {
-        const rawHistory = localStorage.getItem("recentScansHistory");
+        const rawHistory = getUserLocalItem("recentScansHistory", user?.uid);
         if (rawHistory) {
           const parsed = JSON.parse(rawHistory);
           if (Array.isArray(parsed) && parsed.length > 0) hasScanHistory = true;
@@ -109,18 +110,18 @@ export default function DashboardHome() {
           const settingsData = settingsSnap.data();
           if (settingsData?.homeLocation && !localHome) {
             localHome = settingsData.homeLocation;
-            localStorage.setItem("userHomeLocation", localHome);
+            setUserPref("userHomeLocation", localHome, user.uid);
           }
           if (settingsData?.targetTrack && !localTrack) {
             localTrack = settingsData.targetTrack;
-            localStorage.setItem("userTargetTrack", localTrack);
+            setUserPref("userTargetTrack", localTrack, user.uid);
           }
           if (settingsData?.githubUsername && !localGithub) {
             localGithub = settingsData.githubUsername;
-            localStorage.setItem("userGithubUsername", localGithub);
+            setUserPref("userGithubUsername", localGithub, user.uid);
           }
-          if (settingsData?.preferredLatexTemplate && !localStorage.getItem("userPreferredLatexTemplate")) {
-            localStorage.setItem("userPreferredLatexTemplate", settingsData.preferredLatexTemplate);
+          if (settingsData?.preferredLatexTemplate && !getUserPref("userPreferredLatexTemplate", user.uid)) {
+            setUserPref("userPreferredLatexTemplate", settingsData.preferredLatexTemplate, user.uid);
           }
         }
 

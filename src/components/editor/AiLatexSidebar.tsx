@@ -24,6 +24,7 @@ import {
 import { Suggestion } from "@/components/analysis/ImprovementSuggestionCard";
 import { ResumeData } from "@/components/pdf/ResumeDocument";
 import { formatGithubRepoToTex, generateCoverLetterLatex } from "@/lib/latexTemplates";
+import { getUserPref, setUserPref } from "@/lib/userStorage";
 
 interface GithubSyncedRepo {
   name: string;
@@ -120,12 +121,11 @@ export function AiLatexSidebar({
 
   // GitHub Sync State
   const [githubUsername, setGithubUsername] = useState<string>(() =>
-    typeof window !== "undefined" ? localStorage.getItem("userGithubUsername") || "" : ""
+    getUserPref("userGithubUsername")
   );
   const [githubTargetRole, setGithubTargetRole] = useState<string>(() => {
     if (jobTitle) return jobTitle;
-    if (typeof window !== "undefined") return localStorage.getItem("userTargetTrack") || "";
-    return "";
+    return getUserPref("userTargetTrack");
   });
   const [isSyncingGithub, setIsSyncingGithub] = useState(false);
   const [githubError, setGithubError] = useState("");
@@ -234,8 +234,8 @@ export function AiLatexSidebar({
 
       if (data.profile) {
         setGithubProfile(data.profile);
-        if (data.profile.username && typeof window !== "undefined") {
-          localStorage.setItem("userGithubUsername", data.profile.username);
+        if (data.profile.username) {
+          setUserPref("userGithubUsername", data.profile.username);
         }
       }
       setGithubRepos(Array.isArray(data.repos) ? data.repos : []);
@@ -287,8 +287,7 @@ export function AiLatexSidebar({
     onJobMetaChange?.({ company: effectiveCompany, jobTitle: effectiveTitle });
 
     try {
-      const track =
-        typeof window !== "undefined" ? localStorage.getItem("userTargetTrack") || undefined : undefined;
+      const track = getUserPref("userTargetTrack") || undefined;
       const res = await fetch("/api/career-kit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

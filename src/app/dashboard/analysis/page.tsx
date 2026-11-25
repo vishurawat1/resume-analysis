@@ -37,6 +37,7 @@ import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { cn, replaceResumeSubstring } from "@/lib/utils";
+import { getUserLocalItem, getUserPref, setUserLocalItem, setUserPref } from "@/lib/userStorage";
 
 interface DeepAIResult {
   overallScore: number;
@@ -69,10 +70,10 @@ interface ScanSnapshot {
 const RECENT_SCANS_KEY = "recentScansHistory";
 const MAX_RECENT_SCANS = 5;
 
-function loadRecentScans(): ScanSnapshot[] {
+function loadRecentScans(uid?: string | null): ScanSnapshot[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(RECENT_SCANS_KEY);
+    const raw = getUserLocalItem(RECENT_SCANS_KEY, uid);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -101,6 +102,7 @@ function getScanFingerprint(jobTitle: string, company: string, jobDescription: s
 }
 
 function upsertRecentScan(input: {
+  uid?: string | null;
   jobTitle: string;
   company: string;
   location: string;
@@ -108,7 +110,7 @@ function upsertRecentScan(input: {
   result: DeepAIResult;
   fileName?: string;
 }): { scans: ScanSnapshot[]; activeId: string } {
-  const existing = loadRecentScans();
+  const existing = loadRecentScans(input.uid);
   const fp = getScanFingerprint(input.jobTitle, input.company, input.jobDescription);
   const now = new Date().toISOString();
 
@@ -147,11 +149,7 @@ function upsertRecentScan(input: {
     next = [created, ...existing].slice(0, MAX_RECENT_SCANS);
   }
 
-  try {
-    localStorage.setItem(RECENT_SCANS_KEY, JSON.stringify(next));
-  } catch {
-    // Ignore storage quota errors
-  }
+  setUserLocalItem(RECENT_SCANS_KEY, JSON.stringify(next), input.uid);
 
   return { scans: next, activeId };
 }
@@ -210,10 +208,7 @@ export default function AnalysisPage() {
       let jobTitle = sessionStorage.getItem("jobTitle") || "";
       let company = sessionStorage.getItem("company") || "";
       let location = sessionStorage.getItem("location") || "";
-      let candidateLocation =
-        sessionStorage.getItem("userHomeLocation") ||
-        (typeof window !== "undefined" ? localStorage.getItem("userHomeLocation") : null) ||
-        "";
+      let candidateLocation = getUserPref("userHomeLocation", user?.uid);
 
       // Fallback to Firestore if we have a logged-in user and session is empty
       if (user) {
@@ -245,7 +240,7 @@ export default function AnalysisPage() {
             const settingsSnap = await getDoc(settingsRef);
             if (settingsSnap.exists() && settingsSnap.data()?.homeLocation) {
               candidateLocation = settingsSnap.data().homeLocation;
-              sessionStorage.setItem("userHomeLocation", candidateLocation);
+              setUserPref("userHomeLocation", candidateLocation, user.uid);
             }
           }
         } catch (err) {
@@ -253,7 +248,7 @@ export default function AnalysisPage() {
         }
       }
 
-      const existingHistory = loadRecentScans();
+      const existingHistory = loadRecentScans(user?.uid);
       setRecentScans(existingHistory);
 
       // If resume exists but JD was cleared, restore latest snapshot cleanly
@@ -297,6 +292,7 @@ export default function AnalysisPage() {
           const parsed = JSON.parse(cachedAiResultStr) as DeepAIResult;
           if (parsed && typeof parsed.overallScore === "number") {
             const { scans, activeId } = upsertRecentScan({
+              uid: user?.uid,
               jobTitle,
               company,
               location,
@@ -335,6 +331,7 @@ export default function AnalysisPage() {
           setAiError(data.error);
         } else {
           const { scans, activeId } = upsertRecentScan({
+            uid: user?.uid,
             jobTitle,
             company,
             location,
@@ -366,10 +363,7 @@ export default function AnalysisPage() {
     const jobTitle = activeJobTitle || sessionStorage.getItem("jobTitle") || "";
     const company = activeCompany || sessionStorage.getItem("company") || "";
     const location = activeLocation || sessionStorage.getItem("location") || "";
-    const candidateLocation =
-      sessionStorage.getItem("userHomeLocation") ||
-      (typeof window !== "undefined" ? localStorage.getItem("userHomeLocation") : null) ||
-      "";
+    const candidateLocation = getUserPref("userHomeLocation", user?.uid);
 
     if (!resumeText || !jobDescription) {
       setError("No resume or job description found to re-analyze.");
@@ -402,6 +396,7 @@ export default function AnalysisPage() {
         setAiError(data.error);
       } else {
         const { scans, activeId } = upsertRecentScan({
+          uid: user?.uid,
           jobTitle,
           company,
           location,
@@ -450,11 +445,7 @@ export default function AnalysisPage() {
   const handleRemoveScan = (scanId: string) => {
     const next = recentScans.filter((s) => s.id !== scanId);
     setRecentScans(next);
-    try {
-      localStorage.setItem(RECENT_SCANS_KEY, JSON.stringify(next));
-    } catch {
-      // Ignore storage errors
-    }
+    setUserLocalItem(RECENT_SCANS_KEY, JSON.stringify(next), user?.uid);
   };
 
   const handleOpenInLatexStudio = (options?: {

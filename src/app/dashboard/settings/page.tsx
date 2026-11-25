@@ -3,6 +3,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { getUserPref, setUserPref } from "@/lib/userStorage";
 import {
   Settings,
   LogOut,
@@ -144,26 +145,11 @@ export default function SettingsPage() {
       await Promise.resolve();
       if (cancelled) return;
 
-      const savedLoc =
-        localStorage.getItem("userHomeLocation") ||
-        sessionStorage.getItem("userHomeLocation") ||
-        "";
-      const savedPref =
-        localStorage.getItem("userWorkPreference") ||
-        sessionStorage.getItem("userWorkPreference") ||
-        "flexible";
-      const savedGithub =
-        localStorage.getItem("userGithubUsername") ||
-        sessionStorage.getItem("userGithubUsername") ||
-        "";
-      const savedTrack =
-        localStorage.getItem("userTargetTrack") ||
-        sessionStorage.getItem("userTargetTrack") ||
-        "Software Engineering";
-      const savedTemplate =
-        localStorage.getItem("userPreferredLatexTemplate") ||
-        sessionStorage.getItem("userPreferredLatexTemplate") ||
-        "jakes";
+      const savedLoc = getUserPref("userHomeLocation", user?.uid);
+      const savedPref = getUserPref("userWorkPreference", user?.uid) || "flexible";
+      const savedGithub = getUserPref("userGithubUsername", user?.uid);
+      const savedTrack = getUserPref("userTargetTrack", user?.uid) || "Software Engineering";
+      const savedTemplate = getUserPref("userPreferredLatexTemplate", user?.uid) || "jakes";
 
       if (savedLoc) setHomeLocation(savedLoc);
       if (savedPref) setWorkPreference(savedPref);
@@ -180,28 +166,23 @@ export default function SettingsPage() {
           const data = snap.data();
           if (data?.homeLocation) {
             setHomeLocation(data.homeLocation);
-            localStorage.setItem("userHomeLocation", data.homeLocation);
-            sessionStorage.setItem("userHomeLocation", data.homeLocation);
+            setUserPref("userHomeLocation", data.homeLocation, user.uid);
           }
           if (data?.workPreference) {
             setWorkPreference(data.workPreference);
-            localStorage.setItem("userWorkPreference", data.workPreference);
-            sessionStorage.setItem("userWorkPreference", data.workPreference);
+            setUserPref("userWorkPreference", data.workPreference, user.uid);
           }
           if (data?.githubUsername) {
             setGithubUsername(data.githubUsername);
-            localStorage.setItem("userGithubUsername", data.githubUsername);
-            sessionStorage.setItem("userGithubUsername", data.githubUsername);
+            setUserPref("userGithubUsername", data.githubUsername, user.uid);
           }
           if (data?.targetTrack) {
             setTargetTrack(data.targetTrack);
-            localStorage.setItem("userTargetTrack", data.targetTrack);
-            sessionStorage.setItem("userTargetTrack", data.targetTrack);
+            setUserPref("userTargetTrack", data.targetTrack, user.uid);
           }
           if (data?.preferredLatexTemplate) {
             setPreferredLatexTemplate(data.preferredLatexTemplate);
-            localStorage.setItem("userPreferredLatexTemplate", data.preferredLatexTemplate);
-            sessionStorage.setItem("userPreferredLatexTemplate", data.preferredLatexTemplate);
+            setUserPref("userPreferredLatexTemplate", data.preferredLatexTemplate, user.uid);
           }
         }
       } catch (err) {
@@ -226,28 +207,12 @@ export default function SettingsPage() {
     const cleanedGithub = cleanGithubUsername(githubUsername);
     setGithubUsername(cleanedGithub);
 
-    // Persist in client storage
-    if (typeof window !== "undefined") {
-      localStorage.setItem("userHomeLocation", trimmedLoc);
-      sessionStorage.setItem("userHomeLocation", trimmedLoc);
-
-      localStorage.setItem("userWorkPreference", workPreference);
-      sessionStorage.setItem("userWorkPreference", workPreference);
-
-      if (cleanedGithub) {
-        localStorage.setItem("userGithubUsername", cleanedGithub);
-        sessionStorage.setItem("userGithubUsername", cleanedGithub);
-      } else {
-        localStorage.removeItem("userGithubUsername");
-        sessionStorage.removeItem("userGithubUsername");
-      }
-
-      localStorage.setItem("userTargetTrack", targetTrack);
-      sessionStorage.setItem("userTargetTrack", targetTrack);
-
-      localStorage.setItem("userPreferredLatexTemplate", preferredLatexTemplate);
-      sessionStorage.setItem("userPreferredLatexTemplate", preferredLatexTemplate);
-    }
+    // Persist in UID-scoped client storage
+    setUserPref("userHomeLocation", trimmedLoc, user?.uid);
+    setUserPref("userWorkPreference", workPreference, user?.uid);
+    setUserPref("userGithubUsername", cleanedGithub, user?.uid);
+    setUserPref("userTargetTrack", targetTrack, user?.uid);
+    setUserPref("userPreferredLatexTemplate", preferredLatexTemplate, user?.uid);
 
     // Persist to Firestore if logged in
     let cloudSyncFailed = false;

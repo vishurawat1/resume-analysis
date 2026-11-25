@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { escapeLatex } from "@/lib/latexTemplates";
+import { getUserPref } from "@/lib/userStorage";
 
 export interface CoverLetterPayload {
   subject: string;
@@ -199,11 +200,7 @@ const CATEGORY_STYLES: Record<string, string> = {
 const emptySubscribe = () => () => {};
 
 function getTargetTrackSnapshot(): string {
-  try {
-    return localStorage.getItem("userTargetTrack") || "";
-  } catch {
-    return "";
-  }
+  return getUserPref("userTargetTrack");
 }
 
 export function CareerKitSection({
@@ -270,7 +267,7 @@ export function CareerKitSection({
     setPdfError("");
 
     try {
-      const track = typeof window !== "undefined" ? localStorage.getItem("userTargetTrack") || undefined : undefined;
+      const track = getUserPref("userTargetTrack") || undefined;
       const res = await fetch("/api/career-kit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

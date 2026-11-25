@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
+import { getUserPref } from "@/lib/userStorage";
 
 interface RolePreset {
   id: string;
@@ -168,10 +169,10 @@ Infrastructure & Data: PostgreSQL, Redis, Apache Kafka, Docker, Kubernetes, AWS,
 
 const SAMPLE_RESUME_FILENAME = "Alex_Rivera_Sample_Resume.txt";
 
-function syncUserPreferencesToSession() {
-  const storedHome = localStorage.getItem("userHomeLocation");
+function syncUserPreferencesToSession(uid?: string | null) {
+  const storedHome = getUserPref("userHomeLocation", uid);
   if (storedHome) sessionStorage.setItem("userHomeLocation", storedHome);
-  const storedTrack = localStorage.getItem("userTargetTrack");
+  const storedTrack = getUserPref("userTargetTrack", uid);
   if (storedTrack) sessionStorage.setItem("userTargetTrack", storedTrack);
 }
 
@@ -346,7 +347,7 @@ export default function UploadPage() {
     sessionStorage.setItem("jobTitle", jobTitle);
     sessionStorage.setItem("company", company);
     sessionStorage.setItem("location", location);
-    syncUserPreferencesToSession();
+    syncUserPreferencesToSession(user?.uid);
     router.push("/dashboard/editor");
   };
 
@@ -384,7 +385,7 @@ export default function UploadPage() {
       sessionStorage.setItem("jobTitle", jobTitle);
       sessionStorage.setItem("company", company);
       sessionStorage.setItem("location", location);
-      syncUserPreferencesToSession();
+      syncUserPreferencesToSession(user?.uid);
 
       router.push("/dashboard/analysis");
     } catch (err) {
